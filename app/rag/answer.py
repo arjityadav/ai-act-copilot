@@ -21,7 +21,9 @@ REFUSAL = "I couldn't find this in the AI Act text I have."
 @dataclass
 class RagAnswer:
     answer: str
-    sources: list[dict] = field(default_factory=list)     # [{"n": 1, "citation": "Article 5", "chunk_id": ..., "title": ...}]
+    sources: list[dict] = field(
+        default_factory=list
+    )  # [{"n": 1, "citation": "Article 5", "chunk_id": ..., "title": ...}]
     citations_valid: bool = True
     refused: bool = False
     prompt_version: str = ""
@@ -44,22 +46,30 @@ def build_user_message(question: str, chunks: list[Chunk]) -> str:
     Numbering starts at 1, in the order of `chunks`. If there are no chunks, the documents
     block is "<documents>\\n</documents>" (the model should then refuse).
     """
-    # YOUR CODE
-    raise NotImplementedError
+    lines = ["<documents>"]
+    for n, chunk in enumerate(chunks, start=1):
+        lines.append(f'<document n="{n}" citation="{chunk.citation}">\n{chunk.text}\n</document>')
+    lines.append("</documents>")
+    return "\n".join(lines) + f"\n\n<question>{question}</question>"
 
 
 def extract_citations(text: str) -> list[int]:
     """All citation numbers in order of appearance, without duplicates.
     Handles "[2]", "[1][3]" and "[1, 3]" / "[1,3]" styles. Ignore brackets without only digits/commas."""
-    # YOUR CODE
-    raise NotImplementedError
+    citations = re.findall(r"\[(\d+(?:,\s*\d+)*)\]", text)
+    citations_int = [int(n) for n in citations for n in n.split(",")]
+    return sorted(set(citations_int), key=citations_int.index)
 
 
 def citations_are_valid(text: str, n_sources: int) -> bool:
     """True if the answer is a refusal (contains REFUSAL), or if it cites at least one source and
     every cited number is between 1 and n_sources."""
-    # YOUR CODE
-    raise NotImplementedError
+    if REFUSAL in text:
+        return True
+    citations = extract_citations(text)
+    if not citations:
+        return False
+    return all(1 <= citation <= n_sources for citation in citations)
 
 
 def answer_question(question: str, store, embedder, provider, k: int = 6) -> RagAnswer:
@@ -72,5 +82,19 @@ def answer_question(question: str, store, embedder, provider, k: int = 6) -> Rag
     - refused = REFUSAL in the answer; citations_valid = citations_are_valid(answer, len(chunks))
     - return RagAnswer(answer, sources, citations_valid, refused, prompt.version)
     """
-    # YOUR CODE
-    raise NotImplementedError
+    chunks = hybrid_search(question, store, embedder, k=k)
+    prompt = get_prompt("rag_answer")
+    user_message = build_user_message(question, chunks)
+    result = provider.complete(
+        [{"role": "user", "content": user_message}],
+        system=prompt.system,
+        temperature=0.0,
+    )
+    answer = result.text
+    sources = [
+        {"n": i, "citation": chunk.citation, "chunk_id": chunk.id, "title": chunk.title}
+        for i, chunk in enumerate(chunks, start=1)
+    ]
+    refused = REFUSAL in answer
+    citations_valid = citations_are_valid(answer, len(chunks))
+    return RagAnswer(answer, sources, citations_valid, refused, prompt.version)

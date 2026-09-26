@@ -1,0 +1,53 @@
+text,label
+"Recommends products to online shoppers based on their browsing history",none
+"Forecasts weekly inventory demand for our warehouses",none
+"Filters spam and phishing emails for employees",none
+"Generates first drafts of marketing copy for social media",none
+"Optimises delivery routes for our van fleet",none
+"Suggests playlist songs based on listening habits",none
+"Translates product descriptions into German and French",none
+"Detects defects in photos of manufactured screws on the assembly line",none
+"Matches a traveller's face at the airport gate against a watchlist of wanted persons",biometrics
+"Identifies shoppers from CCTV footage after the fact to find repeat shoplifters",biometrics
+"Categorises people in photos by inferred ethnicity and age group",biometrics
+"Verifies identity by comparing a live selfie with a passport photo for remote identification of many users",biometrics
+"Recognises employees by their gait from security camera streams",biometrics
+"Detects emotions of customers from their faces in a store to measure satisfaction",biometrics
+"Controls valve settings in the regional water supply network to keep pressure safe",critical_infrastructure
+"Balances load on the electricity grid and triggers automatic safety shutdowns",critical_infrastructure
+"Manages traffic light timing across the city road network",critical_infrastructure
+"Monitors gas pipeline sensors and decides when to close safety valves",critical_infrastructure
+"Controls district heating supply during winter peaks as a safety component",critical_infrastructure
+"Ranks university applicants and recommends who gets admitted",education
+"Automatically grades students' written exams and sets final marks",education
+"Watches students through their webcams during online exams to flag cheating",education
+"Decides which school track a pupil is placed in based on test results",education
+"Assesses the appropriate level of education a student should access at a vocational college",education
+"Scores apprentices' practical assessments to decide who passes the training",education
+"Screens CVs and ranks job applicants for recruiters",employment
+"Analyses video interviews to score candidates' suitability for the role",employment
+"Decides which warehouse workers get shifts based on productivity scores",employment
+"Evaluates employee performance data to recommend promotions and dismissals",employment
+"Targets job ads to specific groups of candidates on social media",employment
+"Allocates tasks to delivery riders based on behaviour and personal traits",employment
+"Monitors the keystrokes and activity of remote staff to rate their work",employment
+"Calculates credit scores to decide whether consumers get a loan",essential_services
+"Sets life insurance premiums based on an individual risk assessment",essential_services
+"Decides eligibility for unemployment benefits and flags fraud",essential_services
+"Prioritises emergency calls and dispatches ambulances",essential_services
+"Assesses health insurance applicants and prices their policies",essential_services
+"Evaluates whether citizens qualify for housing support payments",essential_services
+"Assesses the risk that a person will become a victim of crime for the police",law_enforcement
+"Evaluates the reliability of evidence collected in criminal investigations",law_enforcement
+"Profiles suspects during investigations to prioritise police resources",law_enforcement
+"Serves as a polygraph-like tool for police interviews",law_enforcement
+"Supports police in assessing the risk of a person re-offending based on their profile",law_enforcement
+"Assesses asylum applications and the credibility of applicants' statements",migration
+"Estimates security risks of travellers applying for entry visas",migration
+"Examines residence permit applications and recommends decisions",migration
+"Detects persons at the border from sensor data for border management",migration
+"Assists judges in researching facts and applying the law to a case",justice_democracy
+"Recommends sentences to judges based on similar past cases",justice_democracy
+"Supports arbitrators in interpreting facts and law in dispute resolution",justice_democracy
+"Designs targeted messages intended to influence how people vote in an election",justice_democracy
+"Optimises political campaign messaging to change voting behaviour of specific voter groups",justice_democracy

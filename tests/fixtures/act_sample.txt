@@ -1,0 +1,52 @@
+Regulation (EU) 2024/1689 of the European Parliament and of the Council (sample for tests)
+Whereas:
+(1) This recital mentions Article 5 and Annex III in running text; they are not provisions.
+(2) Article 50 is also mentioned here.
+HAVE ADOPTED THIS REGULATION:
+CHAPTER I
+GENERAL PROVISIONS
+Article 1
+Subject matter
+1.
+The purpose of this Regulation is to improve the functioning of the internal market and promote human-centric and trustworthy artificial intelligence.
+2. This Regulation lays down harmonised rules for the placing on the market of AI systems in the Union.
+Article 3
+Definitions
+For the purposes of this Regulation, the following definitions apply:
+(1) 'AI system' means a machine-based system designed to operate with varying levels of autonomy that infers from input how to generate outputs;
+(2) 'provider' means a natural or legal person that develops an AI system and places it on the market under its own name;
+CHAPTER II
+PROHIBITED AI PRACTICES
+Article 5
+Prohibited AI practices
+1. The following AI practices shall be prohibited:
+(a) the placing on the market of an AI system that deploys subliminal or manipulative techniques causing significant harm;
+(c) the use of AI systems for the evaluation or classification of natural persons based on their social behaviour, leading to detrimental treatment (social scoring);
+(e) AI systems that create facial recognition databases through the untargeted scraping of facial images from the internet or CCTV footage;
+(f) AI systems to infer emotions of a natural person in the areas of workplace and education institutions, except for medical or safety reasons;
+2. The use of real-time remote biometric identification systems in publicly accessible spaces for law enforcement shall be subject to strict conditions as referred to in Article 6(2).
+CHAPTER III
+HIGH-RISK AI SYSTEMS
+Article 6
+Classification rules for high-risk AI systems
+1. An AI system shall be considered high-risk where it is intended to be used as a safety component of a product covered by the Union harmonisation legislation listed in Annex I.
+2. In addition, AI systems referred to in Annex III shall be considered to be high-risk.
+3. By derogation, an AI system referred to in Annex III shall not be considered high-risk where it does not pose a significant risk of harm to the health, safety or fundamental rights of natural persons.
+CHAPTER IV
+TRANSPARENCY OBLIGATIONS
+Article 50
+Transparency obligations for providers and deployers of certain AI systems
+1. Providers shall ensure that AI systems intended to interact directly with natural persons are designed so that the persons concerned are informed that they are interacting with an AI system.
+2. Providers of AI systems generating synthetic audio, image, video or text content shall ensure that the outputs are marked in a machine-readable format and detectable as artificially generated.
+4. Deployers of an AI system that generates deep fakes shall disclose that the content has been artificially generated.
+Article 99
+Penalties
+Article 99
+Penalties
+1. Non-compliance with the prohibition of AI practices referred to in Article 5 shall be subject to fines of up to EUR 35 000 000 or up to 7 % of total worldwide annual turnover.
+ANNEX III
+High-risk AI systems referred to in Article 6(2)
+High-risk AI systems pursuant to Article 6(2) are the AI systems listed in any of the following areas:
+1. Biometrics: remote biometric identification systems; biometric categorisation; emotion recognition.
+4. Employment, workers management and access to self-employment: AI systems intended to be used for the recruitment or selection of natural persons, in particular to place targeted job advertisements, to analyse and filter job applications, and to evaluate candidates.
+5. Access to essential private services and essential public services: AI systems intended to be used to evaluate the creditworthiness of natural persons or establish their credit score; risk assessment and pricing in relation to life and health insurance.

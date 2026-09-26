@@ -1,0 +1,25 @@
+{"id": "r01", "question": "Which AI practices are banned outright?", "relevant": ["art-5"]}
+{"id": "r02", "question": "When is an AI system considered high-risk?", "relevant": ["art-6", "annex-iii"]}
+{"id": "r03", "question": "Can I use AI to screen and rank job applicants?", "relevant": ["annex-iii", "art-6"]}
+{"id": "r04", "question": "Do I have to tell users they are talking to a chatbot?", "relevant": ["art-50"]}
+{"id": "r05", "question": "Must AI-generated images be labelled or watermarked?", "relevant": ["art-50"]}
+{"id": "r06", "question": "What is the legal definition of an AI system?", "relevant": ["art-3"]}
+{"id": "r07", "question": "Do staff who use AI need training or AI literacy?", "relevant": ["art-4"]}
+{"id": "r08", "question": "What risk management does a provider of a high-risk system need?", "relevant": ["art-9"]}
+{"id": "r09", "question": "Requirements for training data quality and bias examination", "relevant": ["art-10"]}
+{"id": "r10", "question": "What goes into the technical documentation of a high-risk AI system?", "relevant": ["art-11", "annex-iv"]}
+{"id": "r11", "question": "Do high-risk systems have to keep logs automatically?", "relevant": ["art-12"]}
+{"id": "r12", "question": "How must humans be able to oversee and stop a high-risk AI system?", "relevant": ["art-14"]}
+{"id": "r13", "question": "Accuracy, robustness and cybersecurity requirements", "relevant": ["art-15"]}
+{"id": "r14", "question": "What are the obligations of companies deploying (using) a high-risk AI system?", "relevant": ["art-26"]}
+{"id": "r15", "question": "Who has to do a fundamental rights impact assessment?", "relevant": ["art-27"]}
+{"id": "r16", "question": "Obligations for providers of general-purpose AI models", "relevant": ["art-53"]}
+{"id": "r17", "question": "Extra duties for general-purpose AI models with systemic risk", "relevant": ["art-55", "art-51"]}
+{"id": "r18", "question": "How high are the fines for breaking the rules?", "relevant": ["art-99"]}
+{"id": "r19", "question": "What is a quality management system under the AI Act?", "relevant": ["art-17"]}
+{"id": "r20", "question": "Do serious incidents have to be reported, and to whom?", "relevant": ["art-73"]}
+{"id": "r21", "question": "Is credit scoring by AI regulated?", "relevant": ["annex-iii"]}
+{"id": "r22", "question": "Post-market monitoring after the system is on the market", "relevant": ["art-72"]}
+{"id": "r23", "question": "Conformity assessment procedure before placing on the market", "relevant": ["art-43"]}
+{"id": "r24", "question": "What must providers tell deployers in the instructions for use?", "relevant": ["art-13"]}
+{"id": "r25", "question": "Regulatory sandboxes for testing AI", "relevant": ["art-57"]}

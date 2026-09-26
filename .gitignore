@@ -1,0 +1,14 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+data/raw/
+data/models/
+data/training/annex3.csv.bak
+mlruns/
+mlartifacts/
+evals/results/
+*.log

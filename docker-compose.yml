@@ -1,0 +1,104 @@
+# Local stack:  docker compose up -d        (first run: make models  to pull the Ollama models)
+# Services: api, worker (RQ), db (Postgres + pgvector), redis, ollama, mlflow, prometheus, grafana, ui
+
+x-app-env: &app-env
+  APP_ENV: dev
+  DATABASE_URL: postgresql://copilot:copilot@db:5432/copilot
+  REDIS_URL: redis://redis:6379/0
+  OLLAMA_HOST: http://ollama:11434
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  LLM_PROVIDERS: ${LLM_PROVIDERS:-ollama}
+  OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  API_KEY: ${API_KEY:-}
+  JOB_MODE: queue
+  STORE: postgres
+
+services:
+  api:
+    build: .
+    environment:
+      <<: *app-env
+      APP_ENV: dev
+    ports: ["8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["rq", "worker", "assessments", "--url", "redis://redis:6379/0"]
+    environment: *app-env
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    restart: unless-stopped
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: copilot
+      POSTGRES_PASSWORD: copilot
+      POSTGRES_DB: copilot
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copilot"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes: ["ollama:/root/.ollama"]
+    # On Linux with an NVIDIA GPU, uncomment:
+    # deploy: {resources: {reservations: {devices: [{driver: nvidia, count: all, capabilities: [gpu]}]}}}
+    # On Mac, Docker can't use the GPU: run the Ollama app natively instead and set
+    # OLLAMA_HOST=http://host.docker.internal:11434 for api/worker.
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest   # pin a version tag for reproducibility
+    command: ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000",
+              "--backend-store-uri", "sqlite:////mlflow/mlflow.db", "--artifacts-destination", "/mlflow/artifacts"]
+    ports: ["5000:5000"]
+    volumes: ["mlflow:/mlflow"]
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes: ["./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes: ["./monitoring/grafana:/etc/grafana/provisioning:ro"]
+    ports: ["3000:3000"]
+    depends_on: [prometheus]
+
+  ui:
+    build: .
+    command: ["streamlit", "run", "ui/streamlit_app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
+    environment:
+      API_URL: http://api:8000
+      API_KEY: ${API_KEY:-}
+    volumes: ["./ui:/app/ui:ro"]
+    ports: ["8501:8501"]
+    depends_on: [api]
+    profiles: ["ui"]
+
+volumes:
+  pgdata:
+  ollama:
+  mlflow:

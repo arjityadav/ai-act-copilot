@@ -1,0 +1,149 @@
+# Obligations by category and role, with application dates after the AI Omnibus
+# (entered into force 27 July 2026). Curated from Regulation (EU) 2024/1689 as amended.
+# Decision support, not legal advice: verify against the current consolidated text before relying on it.
+# categories: which assessment categories trigger the obligation ("transparency" = Article 50 applies)
+
+- id: ai_literacy
+  title: AI literacy measures
+  articles: [art-4]
+  applies_to: all
+  applies_from: "2025-02-02"
+  categories: [prohibited, high_risk, limited_risk, minimal_risk, gpai, transparency]
+  description: Support sufficient AI literacy of staff and others operating or using AI systems on your behalf.
+
+- id: stop_prohibited
+  title: Stop or redesign the prohibited practice
+  articles: [art-5]
+  applies_to: all
+  applies_from: "2025-02-02"
+  categories: [prohibited]
+  description: The practice may not be placed on the market, put into service or used in the EU.
+
+# ---- High-risk: providers
+- id: risk_management
+  title: Risk management system
+  articles: [art-9]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Continuous, documented process to identify, analyse, evaluate and mitigate risks across the lifecycle.
+- id: data_governance
+  title: Data and data governance
+  articles: [art-10]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Training, validation and test data must be relevant, representative, examined for bias and documented.
+- id: technical_documentation
+  title: Technical documentation
+  articles: [art-11, annex-iv]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Documentation per Annex IV before placing on the market, kept up to date.
+- id: record_keeping
+  title: Automatic logging
+  articles: [art-12]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: The system must technically allow automatic recording of events (logs) over its lifetime.
+- id: transparency_to_deployers
+  title: Instructions for use
+  articles: [art-13]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Provide deployers with clear instructions, capabilities, limitations and performance information.
+- id: human_oversight_design
+  title: Human oversight by design
+  articles: [art-14]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Design the system so that natural persons can effectively oversee it, interpret outputs and stop it.
+- id: accuracy_robustness
+  title: Accuracy, robustness and cybersecurity
+  articles: [art-15]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Appropriate, declared accuracy levels; resilience to errors and attacks.
+- id: quality_management
+  title: Quality management system
+  articles: [art-17]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Documented policies and procedures covering design, testing, data, risk and post-market processes.
+- id: conformity_assessment
+  title: Conformity assessment, declaration and CE marking
+  articles: [art-43, art-47, art-48]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Complete the applicable conformity assessment, draw up the EU declaration of conformity and affix CE marking.
+- id: registration
+  title: Registration in the EU database
+  articles: [art-49]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Register the system in the EU database before placing it on the market.
+- id: post_market_monitoring
+  title: Post-market monitoring and serious-incident reporting
+  articles: [art-72, art-73]
+  applies_to: provider
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Monitor performance in use and report serious incidents to market surveillance authorities.
+
+# ---- High-risk: deployers
+- id: deployer_duties
+  title: Deployer obligations (use as instructed, oversight, monitoring, logs)
+  articles: [art-26]
+  applies_to: deployer
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Use per instructions, assign competent human oversight, monitor operation, keep logs, inform affected workers.
+- id: fria
+  title: Fundamental rights impact assessment (where required)
+  articles: [art-27]
+  applies_to: deployer
+  applies_from: "2027-12-02"
+  categories: [high_risk]
+  description: Required for public bodies and private entities providing public services, and for credit scoring and life/health insurance pricing.
+
+# ---- Transparency (Article 50)
+- id: transparency_disclosure
+  title: Transparency to people (AI interaction, synthetic content, deepfakes)
+  articles: [art-50]
+  applies_to: all
+  applies_from: "2026-08-02"
+  categories: [transparency]
+  description: Tell people they interact with AI; mark AI-generated content in a machine-readable way (grace period to 2026-12-02 for systems already on the market); disclose deepfakes.
+
+# ---- General-purpose AI models
+- id: gpai_documentation
+  title: GPAI model documentation, downstream information, copyright policy, training summary
+  articles: [art-53]
+  applies_to: provider
+  applies_from: "2025-08-02"
+  categories: [gpai]
+  description: Models placed on the market before 2025-08-02 must comply by 2027-08-02.
+- id: gpai_systemic
+  title: Systemic-risk GPAI duties (if above the systemic-risk threshold)
+  articles: [art-51, art-55]
+  applies_to: provider
+  applies_from: "2025-08-02"
+  categories: [gpai]
+  description: Model evaluation incl. adversarial testing, systemic risk mitigation, incident reporting, cybersecurity.
+
+# ---- Minimal risk
+- id: voluntary_codes
+  title: Voluntary codes of conduct (recommended)
+  articles: [art-95]
+  applies_to: all
+  applies_from: "2025-02-02"
+  categories: [minimal_risk, limited_risk]
+  description: No mandatory requirements beyond AI literacy; voluntary codes encouraged.

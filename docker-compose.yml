@@ -35,6 +35,11 @@ services:
       db: {condition: service_healthy}
       redis: {condition: service_healthy}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import redis; redis.Redis.from_url('redis://redis:6379/0').ping()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   db:
     image: pgvector/pgvector:pg16
@@ -59,18 +64,19 @@ services:
 
   ollama:
     image: ollama/ollama:latest
+    profiles: ["ollama"]
     ports: ["11434:11434"]
     volumes: ["ollama:/root/.ollama"]
     # On Linux with an NVIDIA GPU, uncomment:
     # deploy: {resources: {reservations: {devices: [{driver: nvidia, count: all, capabilities: [gpu]}]}}}
     # On Mac, Docker can't use the GPU: run the Ollama app natively instead and set
-    # OLLAMA_HOST=http://host.docker.internal:11434 for api/worker.
+    # DOCKER_OLLAMA_HOST=http://host.docker.internal:11434 for api/worker.
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:latest   # pin a version tag for reproducibility
     command: ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000",
               "--backend-store-uri", "sqlite:////mlflow/mlflow.db", "--artifacts-destination", "/mlflow/artifacts"]
-    ports: ["5000:5000"]
+    ports: ["5001:5000"]
     volumes: ["mlflow:/mlflow"]
 
   prometheus:

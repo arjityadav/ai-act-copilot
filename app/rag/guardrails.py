@@ -34,8 +34,14 @@ def check_input(text: str, max_chars: int = 8000) -> GuardResult:
     - longer than max_chars            -> GuardResult(False, "too_long")
     - matches any INJECTION_PATTERNS   -> GuardResult(False, "possible_injection")  (case-insensitive)
     - otherwise                        -> GuardResult(True)"""
-    # YOUR CODE
-    raise NotImplementedError
+    if not text.strip():
+        return GuardResult(False, "empty")
+    if len(text) > max_chars:
+        return GuardResult(False, "too_long")
+    for pattern in INJECTION_PATTERNS:
+        if re.search(pattern, text, flags=re.IGNORECASE):
+            return GuardResult(False, "possible_injection")
+    return GuardResult(True)
 
 
 def redact_pii(text: str) -> str:
@@ -46,5 +52,12 @@ def redact_pii(text: str) -> str:
       dashes, slashes or parentheses (e.g. "+49 30 1234567", "030/123 4567") -> "[PHONE]".
       (Starting with + or 0 keeps legal references like "Regulation 2024/1689" intact.)
     Replace IBANs before phone numbers (an IBAN contains long digit runs)."""
-    # YOUR CODE
-    raise NotImplementedError
+    if not text:
+        return text
+    # email addresses
+    text = re.sub(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b", "[EMAIL]", text)
+    # IBANs
+    text = re.sub(r"\b[A-Z]{2}\d{2}(?:[A-Z0-9 ]{11,30})\b", "[IBAN]", text)
+    # phone numbers
+    text = re.sub(r"(?:\+|\b0)[\d\s\-\/()]{6,}\d\b", "[PHONE]", text)
+    return text

@@ -39,6 +39,9 @@ target-version = "py311"
 select = ["E", "F", "I", "B", "UP"]
 ignore = ["E501"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["integration: needs running Postgres/Redis/Ollama (docker compose up)"]

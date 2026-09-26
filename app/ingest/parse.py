@@ -36,12 +36,12 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Provision:
-    id: str                    # "art-5", "art-6a", "annex-iii"
-    kind: str                  # "article" | "annex"
-    number: str                # "5", "6a", "III"
-    title: str                 # "Prohibited AI practices"
-    chapter: str = ""          # "CHAPTER II · PROHIBITED AI PRACTICES" (articles only; "" for annexes)
-    lines: list[str] = field(default_factory=list)   # body lines, in order (title excluded)
+    id: str  # "art-5", "art-6a", "annex-iii"
+    kind: str  # "article" | "annex"
+    number: str  # "5", "6a", "III"
+    title: str  # "Prohibited AI practices"
+    chapter: str = ""  # "CHAPTER II · PROHIBITED AI PRACTICES" (articles only; "" for annexes)
+    lines: list[str] = field(default_factory=list)  # body lines, in order (title excluded)
 
     @property
     def text(self) -> str:
@@ -74,5 +74,71 @@ def parse_act(text: str) -> list[Provision]:
     - If an id repeats (e.g. a table of contents), keep the FIRST provision with content
       and drop later empty duplicates; if the first one is empty, use the later one.
     """
-    # YOUR CODE
-    raise NotImplementedError
+    provisions: list[Provision] = []
+    started = START_MARKER not in text  # no marker → parse from the first line
+
+    chapter = ""  # label of the chapter we're currently in
+    chapter_roman = ""  # "II" from "CHAPTER II", kept until we see its name
+    current: Provision | None = None
+    expect_title = False  # the next line is an article/annex title
+    expect_chapter_name = False  # the next line is a chapter name
+
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+
+        # 1. Skip the recitals, including the marker line itself
+        if not started:
+            if START_MARKER in line:
+                started = True
+            continue
+
+        # 2. Lines that a previous heading told us to expect
+        if expect_chapter_name:
+            chapter = f"CHAPTER {chapter_roman} · {line}"
+            expect_chapter_name = False
+            continue
+
+        if expect_title and current is not None:
+            current.title = line
+            expect_title = False
+            continue
+
+        # 3. Headings
+        if m := CHAPTER_RE.match(line):
+            chapter_roman = m.group(1)
+            expect_chapter_name = True
+            continue
+
+        if m := ARTICLE_RE.match(line):
+            number = m.group(1)
+            current = Provision(
+                id=f"art-{number.lower()}", kind="article", number=number, title="", chapter=chapter
+            )
+            provisions.append(current)
+            expect_title = True
+            continue
+
+        if m := ANNEX_RE.match(line):
+            number = m.group(1)
+            current = Provision(id=f"annex-{number.lower()}", kind="annex", number=number, title="")
+            provisions.append(current)
+            expect_title = True
+            continue
+
+        # 4. Everything else is body text of the current provision
+        if current is not None:
+            current.lines.append(line)
+
+    # 5. Remove duplicates: keep the first one with content
+    result: list[Provision] = []
+    position: dict[str, int] = {}  # id -> index in result
+    for p in provisions:
+        if p.id not in position:
+            position[p.id] = len(result)
+            result.append(p)
+        elif not result[position[p.id]].lines and p.lines:
+            result[position[p.id]] = p  # first was empty, use this one instead
+
+    return result

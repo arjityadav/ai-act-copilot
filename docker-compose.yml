@@ -5,7 +5,7 @@ x-app-env: &app-env
   APP_ENV: dev
   DATABASE_URL: postgresql://copilot:copilot@db:5432/copilot
   REDIS_URL: redis://redis:6379/0
-  OLLAMA_HOST: http://ollama:11434
+  OLLAMA_HOST: ${DOCKER_OLLAMA_HOST:-http://ollama:11434}
   MLFLOW_TRACKING_URI: http://mlflow:5000
   LLM_PROVIDERS: ${LLM_PROVIDERS:-ollama}
   OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}

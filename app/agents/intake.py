@@ -23,5 +23,26 @@ def extract_profile(description: str, provider, answers: dict[str, str] | None =
       append: "Does your organisation develop this system (provider) or use a system built by someone else (deployer)?"
     - Return the profile.
     """
-    # YOUR CODE
-    raise NotImplementedError
+    content = f"<description>\n{description}\n</description>"
+    if answers:
+        clarifications = "\n".join(f"Q: {q}\nA: {a}" for q, a in answers.items())
+        content += f"\n<clarifications>\n{clarifications}\n</clarifications>"
+
+    profile = complete_structured(
+        provider,
+        [{"role": "user", "content": content}],
+        SystemProfile,
+        system=get_prompt("intake").system,
+    )
+
+    if answers:
+        profile.missing_info = [q for q in profile.missing_info if q not in answers]
+
+    if profile.role == "unknown" and not any(
+        word in " ".join(profile.missing_info).lower() for word in ("develop", "provider")
+    ):
+        profile.missing_info.append(
+            "Does your organisation develop this system (provider) or use a system built by someone else (deployer)?"
+        )
+
+    return profile

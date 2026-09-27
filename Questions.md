@@ -261,3 +261,49 @@ assert r.json()["chunks"] > 0 and r.json()["provisions_indexed"] is True
 ```
 
 Assert properties (`> 0`, types) rather than an exact count, so the test doesn't break when the fixture corpus changes. No API key is needed because `require_api_key` only checks when `API_KEY` is set, and it isn't in tests.
+
+---
+
+## Phase 4 · Agents: rules, intake, classifier
+
+### 1. Why combine deterministic rules with an LLM instead of letting the LLM classify alone?
+
+**Answer.** Each does what it's good at. The **LLM** reads messy free text ("we rank CVs for recruiters") and makes judgement calls. **Code** applies fixed legal rules identically every time. For example, emotion recognition in a workplace or education setting is **prohibited** (Article 5(1)(f)); an LLM might miss that 1 time in 50, code never will.
+
+My pipeline: `screen(profile)` produces flags (`prohibited:…`, `annex_iii:employment`, `transparency:…`). They go **into** the classifier's prompt as `<screening_flags>`, and afterwards code **checks the LLM against them**: an `annex_iii` flag with a `minimal_risk` answer, or a `prohibited` flag without a `prohibited` answer, sets `confidence="low"` and adds `rules_disagree_with_llm`. So a wrong LLM answer can't silently contradict a hard rule; it's surfaced for human review.
+
+### 2. What is structured output, and why does the intake agent use it?
+
+**Answer.** Instead of free text, the model returns JSON matching a **schema** (here a Pydantic `SystemProfile` with typed fields and `Literal` enums such as role: provider/deployer/unknown). `complete_structured` sends the schema, **validates** the reply into the model and **retries** on validation errors. Downstream code (`screen`, the classifier) can rely on `profile.emotion_recognition` being a `bool`. No regex parsing, no "the model wrote 'yes' instead of true".
+
+**Contrast from my own project:** in Phase 3 I detected refusals by exact string match, and the local 8B model paraphrased the refusal sentence, so it wasn't recognised. Structured output (e.g. a `refused: bool` field) avoids that whole class of bug.
+
+### 3. What happens when information is missing? How does human-in-the-loop fit in?
+
+**Answer.** The intake agent lists what it couldn't determine in `missing_info`. If the **role** is unknown, code always adds the provider/deployer question, because the AI Act assigns **different obligations** to providers (who build) and deployers (who use), and guessing would produce the wrong obligations. The user's answers come back as `<clarifications>` (Q/A pairs); answered questions are removed from `missing_info`. Missing facts also **cap confidence**: if `missing_info` is non-empty, a `high` confidence is lowered to `medium`. **Ask, don't guess** on key facts.
+
+### 4. Is your classifier an agent or a workflow? Why that choice?
+
+**Answer.** An **agentic workflow**: the steps are fixed in code (**plan → retrieve → decide → verify**) and the LLM works *inside* one step. A free-roaming agent would choose its own tools in a loop. I chose the workflow because in a legal domain I need it to be:
+
+- **predictable and auditable:** the same steps every time, and every citation traceable
+- **testable:** each step is a pure-ish function with a fake LLM (9 tests, 0.12 s)
+- **cheap and bounded:** one LLM call, a fixed maximum context
+
+**Query planning** is the "agentic" part: `plan_queries` always searches Article 5 (prohibited) and Article 6 (high-risk rules), plus the Annex III area, Article 50 and Article 53 **when the flags point to them**, plus the user's own purpose text. The classifier sees the key law even if the user never used legal terms. `gather_context` caps the context at 14 chunks: more costs tokens and latency and hurts attention ("lost in the middle").
+
+### 5. How do you verify the classifier's output in code?
+
+**Answer.** Defence in depth; the LLM judges, code enforces invariants:
+
+1. **Citations:** keep only citations whose provision id was actually in the retrieved documents, and add `dropped_unsupported_citations` if any were removed (repairing the answer, not just flagging it).
+2. **Rules vs LLM:** contradictions set `confidence="low"` and `rules_disagree_with_llm`.
+3. **Flags:** merge the LLM's, the rules' and the verifier's flags into one sorted, de-duplicated list.
+4. **Confidence cap** when facts are missing, and fill in the role from the profile.
+
+**Bugs I made and fixed (good debugging stories):**
+
+- `len()` on an int (`len(n_before)`), and comparing a filtered list's length to *itself* (always false). Save the original length **before** overwriting the list.
+- Using `assessment.missing_info`: that field lives on `SystemProfile`, not `RiskAssessment`. Read the schema.
+- The **order trap:** appending a flag after sorting gave an unsorted list with possible duplicates. The docstring listed "merge" before "disagreement check", but since the check adds a flag it must run first. The listed order isn't always the right code order.
+- **Tests passed, code was still wrong:** `gather_context` de-duplicated by `provision_id` instead of chunk `id`, so it kept only the first chunk of each article. The test corpus has one chunk per provision, so tests couldn't see it; on the real Act, Article 6's later paragraphs would never reach the classifier. Passing tests don't prove correctness; reread the spec.

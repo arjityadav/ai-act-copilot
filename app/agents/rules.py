@@ -11,8 +11,17 @@ from __future__ import annotations
 
 from app.agents.schemas import SystemProfile
 
-WORKPLACE_OR_EDUCATION = ("hr", "human resources", "employment", "workplace", "recruit", "education",
-                          "school", "university", "employee")
+WORKPLACE_OR_EDUCATION = (
+    "hr",
+    "human resources",
+    "employment",
+    "workplace",
+    "recruit",
+    "education",
+    "school",
+    "university",
+    "employee",
+)
 
 
 def screen(profile: SystemProfile) -> list[str]:
@@ -29,5 +38,33 @@ def screen(profile: SystemProfile) -> list[str]:
     "decisions_about_people"    profile.decisions_about_people
     "role_unknown"              profile.role == "unknown"
     """
-    # YOUR CODE
-    raise NotImplementedError
+    flags = set()
+
+    if profile.emotion_recognition and any(word in profile.sector.lower() for word in WORKPLACE_OR_EDUCATION):
+        flags.add("prohibited:emotion_recognition_work_education")
+
+    if profile.annex_iii_area not in ("none", "unknown"):
+        flags.add(f"annex_iii:{profile.annex_iii_area}")
+
+    if profile.safety_component_of_product:
+        flags.add("annex_i:safety_component")
+
+    if profile.interacts_with_people:
+        flags.add("transparency:interaction")
+
+    if profile.generates_content:
+        flags.add("transparency:synthetic_content")
+
+    if profile.is_general_purpose_model:
+        flags.add("gpai:model")
+
+    if profile.uses_biometrics:
+        flags.add("biometrics")
+
+    if profile.decisions_about_people:
+        flags.add("decisions_about_people")
+
+    if profile.role == "unknown":
+        flags.add("role_unknown")
+
+    return sorted(flags)

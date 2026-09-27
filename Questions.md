@@ -425,3 +425,41 @@ Safety:
 | Whole assessment | 5 min 29 s | **2 min 22 s** (−57%) |
 
 **Open items this analysis surfaced:** evals must check the Annex III area and the citations, not just the category ("right for the wrong reason" is a failure); cap confidence when a high-risk result has no citations; check quoted text against the corpus; mark results that hit the retry cap as `done_with_issues` instead of `done`; give the writer actionable feedback (name the exact requirement); and use a stronger model in production.
+
+---
+
+## Infrastructure I5 · Redis and job queues
+
+### 1. Why does `POST /assessments` return 202 instead of the result?
+
+**Answer.** An assessment takes 2–5 minutes (several LLM calls). Doing it inside the request would hit client and proxy **timeouts** (often 30–60 s), **tie up API workers** (the API runs 2 uvicorn workers, so two assessments would block `/chat` and `/health` for everyone), and **lose work** if the API restarted. Instead the API saves the job, enqueues it, and returns **202 Accepted** with an id in milliseconds. A separate **worker** does the slow work; the client **polls** `GET /assessments/{id}` or **streams** progress over SSE (`/events`, with keep-alive pings so proxies don't close idle connections).
+
+### 2. Walk me through what's in Redis and what's in Postgres.
+
+**Answer.** **Claim-check pattern:** Redis holds only a small "ticket", a reference to `run_assessment(<id>)` on the list `rq:queue:assessments`. The data (input, status, result, progress events) lives in **Postgres**, the single source of truth. The worker takes the job (a blocking pop), loads the input by id, sets `running`, runs the LangGraph pipeline, and writes `done` / `needs_input` / `failed`. Every exception is caught and stored as `failed` with the error message, and `job_timeout=900` kills stuck jobs.
+
+What I observed in Redis: `rq:workers` and `rq:worker:<id>` (worker registration), `rq:finished:assessments` (completed-job registry), and no queue key when empty, because Redis deletes empty lists.
+
+### 3. What happens if no worker is running?
+
+**Answer.** I stopped the worker and created an assessment: the API still returned 202, Postgres said `queued`, and `rq info` showed **1 job waiting, 0 workers**. When I started the worker, it took the job within seconds (**1 finished**). The queue **decouples** the API from the workers: the API stays available during worker downtime, deploys or overload, and jobs wait.
+
+**Limit:** in this Compose setup Redis has **no volume**, so recreating the Redis container would lose queued jobs, leaving Postgres rows stuck in `queued`. Production needs Redis persistence (AOF/RDB with a volume) or a managed Redis.
+
+### 4. What happens if the worker dies in the middle of a job? How would you fix it?
+
+**Answer.** `docker compose restart` sends SIGTERM; RQ tries a warm shutdown, but Docker **SIGKILLs** it after the 10 s grace period. A killed process raises no exception, so the `except` that writes `failed` **never runs**. **Postgres says `running` forever**, RQ eventually moves the job to its failed registry as abandoned, the `/events` stream never ends, and nothing retries it. The two systems disagree, and the job is silently lost.
+
+**Fixes (layered):**
+
+1. **Reconciler/sweeper:** periodically mark or re-queue jobs `running` longer than `job_timeout`. It catches every cause of death.
+2. **Retries** (`Retry(max=2)`), which require **idempotent** jobs. Mine mostly are (same row, same pipeline), but retries repeat paid LLM calls.
+3. **Failure callback** (`on_failure`) to keep Postgres in sync with RQ.
+4. **Graceful shutdown:** `stop_grace_period` longer than a typical job, so deploys let running jobs finish.
+5. **Checkpointing** (LangGraph persistence) so a retry resumes from the last completed node instead of re-running expensive steps.
+
+**Delivery guarantees:** today it's **at-most-once** (a crash loses the job). Retries make it **at-least-once**, which is why jobs must be **idempotent**. True exactly-once is hard in distributed systems; at-least-once plus idempotency gets you the same effect in practice.
+
+### 5. Why does answering a clarifying question create a new assessment instead of updating the old one?
+
+**Answer.** `POST /assessments/{id}/answers` starts a **new run** (with `previous` pointing at the old id) containing the original input plus the answers. It gives an **audit trail**: the original run and its questions stay unchanged, which matters for a compliance tool ("what did the system know, and when"). It's also simpler: there's no half-finished graph to pause and resume; the pipeline reruns from `START` and the router sees answers present. The trade-off is one extra LLM call, because intake runs again.

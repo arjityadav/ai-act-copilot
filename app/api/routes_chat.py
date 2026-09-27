@@ -139,3 +139,10 @@ def feedback(req: FeedbackRequest, settings=Depends(settings_dep)):
     else:
         FEEDBACK.append(req.model_dump())
     return {"stored": True}
+
+
+@router.get("/stats")
+def stats(store=Depends(store_dep)):
+    """How much of the AI Act is indexed."""
+    n = store.count()
+    return {"chunks": n, "provisions_indexed": n > 0}

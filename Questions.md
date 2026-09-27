@@ -204,3 +204,60 @@ A **bind mount** (`./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
 - **`denied: denied` pulling `ghcr.io/mlflow/mlflow:latest`:** Docker Hub images pulled fine, so the network was OK. The cause was a stale `ghcr.io` login: Docker sent expired credentials instead of pulling anonymously. `docker logout ghcr.io` fixed it. Follow-up: pin image tags instead of `:latest` for reproducible builds.
 - **401 in Compose but not with `make dev`:** the app doesn't load `.env` itself, while Compose does and passes `API_KEY` in. Same code, different environment, different behaviour. That's a lesson in making configuration explicit.
 - **`healthcheck must be a mapping`:** a YAML indentation error, and then an unsaved editor buffer. I now validate with `docker compose config --quiet` before running anything.
+
+---
+
+## Infrastructure I3 · FastAPI
+
+### 1. Walk me through what happens from `uvicorn app.main:app` to your endpoint running.
+
+**Answer.**
+
+**Startup (once):** uvicorn imports `app/main.py`, and `app = create_app()` builds the app. The **app factory** registers the routers (`include_router` for health, chat and assessments; each area lives in its own `APIRouter` file), adds the metrics **middleware** and the `/metrics` route. Then the **lifespan** handler runs before serving: it applies database migrations and **fails fast** in production if `API_KEY` isn't set.
+
+**Per request (`POST /chat`):**
+1. **Middleware** wraps the whole request (timing and metrics).
+2. **Routing** matches method + path → 404 if nothing matches.
+3. **Router-level dependency** `require_api_key` checks the `X-API-Key` header → 401.
+4. The body is **validated by Pydantic** against `ChatRequest` → automatic 422 on bad input.
+5. The **`Depends(...)`** providers are resolved (settings, store, embedder, provider, cache).
+6. The endpoint runs. It's a plain `def`, so FastAPI runs it in a **thread pool** and the blocking LLM call doesn't block the event loop.
+7. The return value is validated against **`response_model`** and serialised to JSON, and the OpenAPI docs at `/docs` are generated from the same models.
+
+**Why an app factory?** Tests call `create_app()` for a fresh app each time and override its dependencies. There's no shared global state between tests.
+
+### 2. What is dependency injection in FastAPI, and why use it?
+
+**Answer.** An endpoint declares what it needs (`store=Depends(store_dep)`) instead of building it. FastAPI calls the provider and passes the result in. Benefits:
+
+- **Testability:** `app.dependency_overrides[store_dep] = lambda: fake_store` swaps real infrastructure (Postgres, Ollama) for in-memory fakes without changing endpoint code. My Phase 3 API tests run in milliseconds with no services.
+- **Separation of concerns:** endpoints hold business logic; construction and configuration live in `deps.py`.
+- **Reuse:** the same provider serves every endpoint.
+
+### 3. Why are the dependency providers wrapped in `@lru_cache`?
+
+**Answer.** Without it, FastAPI would call `store_dep()` on **every request**, opening a new Postgres connection each time. That's slow (a handshake per request) and under load it exhausts Postgres's connection limit (100 by default). `@lru_cache` builds each object once and shares it, like a singleton. The better production pattern is a **connection pool** (a fixed set of connections that requests borrow).
+
+**Trade-off:** cached objects live as long as the process, so config changes need a restart. I saw this when changing `.env`.
+
+### 4. How is authentication applied, and why is `/health` left public?
+
+**Answer.** The chat router is created with `dependencies=[Depends(require_api_key)]`, so **every route on it**, including ones added later like my `GET /stats`, is protected automatically, and nobody can forget the check. `require_api_key` compares the `X-API-Key` header to `API_KEY` and raises `HTTPException(401)`.
+
+`/health` sits on a separate router **without** auth on purpose: Docker `HEALTHCHECK`s, load balancers and Kubernetes probes call it without credentials. If it required a key, every probe would get 401 and the container would be marked unhealthy.
+
+**Debugging story:** `/chat` worked under `make dev` but returned 401 in Compose. The app doesn't load `.env` itself, while Compose passes `API_KEY` from `.env` into the container. Same code, different environment.
+
+### 5. How would you test an endpoint like `/stats` without Postgres?
+
+**Answer.** Build the app with `create_app()`, override `store_dep` with an in-memory store that has test chunks, and call it with FastAPI's `TestClient` (no real server needed):
+
+```python
+app = create_app()
+app.dependency_overrides[deps.store_dep] = lambda: in_memory_store
+r = TestClient(app).get("/stats")
+assert r.status_code == 200
+assert r.json()["chunks"] > 0 and r.json()["provisions_indexed"] is True
+```
+
+Assert properties (`> 0`, types) rather than an exact count, so the test doesn't break when the fixture corpus changes. No API key is needed because `require_api_key` only checks when `API_KEY` is set, and it isn't in tests.

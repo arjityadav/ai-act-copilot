@@ -307,3 +307,99 @@ My pipeline: `screen(profile)` produces flags (`prohibited:…`, `annex_iii:empl
 - Using `assessment.missing_info`: that field lives on `SystemProfile`, not `RiskAssessment`. Read the schema.
 - The **order trap:** appending a flag after sorting gave an unsorted list with possible duplicates. The docstring listed "merge" before "disagreement check", but since the check adds a flag it must run first. The listed order isn't always the right code order.
 - **Tests passed, code was still wrong:** `gather_context` de-duplicated by `provision_id` instead of chunk `id`, so it kept only the first chunk of each article. The test corpus has one chunk per provision, so tests couldn't see it; on the real Act, Article 6's later paragraphs would never reach the classifier. Passing tests don't prove correctness; reread the spec.
+
+---
+
+## Infrastructure I4 · Postgres & pgvector
+
+**My numbers:** 292 chunks (256 from articles, 36 from annexes), 768-dimensional embeddings (`nomic-embed-text`).
+
+### 1. How is the corpus stored, and why Postgres + pgvector instead of a dedicated vector database?
+
+**Answer.** One `chunks` table holds the text, the metadata (provision id, kind, number, title, chapter), a `content_hash`, an `embedding vector(768)` column, and a `tsv tsvector` column **generated** by Postgres from title + text (English stemming, always in sync, never written by the app). The deterministic `id` primary key makes ingestion idempotent: re-ingesting updates the same rows.
+
+**Why pgvector:** vectors, full-text search, metadata, assessments, LLM-call logs and feedback all live in **one database**. That means one backup, one set of transactions, and SQL joins and filters next to vector search, with no second system to run and keep in sync. At this scale (hundreds to low millions of vectors) Postgres is more than enough. A dedicated vector DB (Qdrant, Weaviate, Pinecone) makes sense at very large scale or for specialised features.
+
+### 2. Explain the two indexes behind your hybrid search.
+
+**Answer.**
+
+- **HNSW** on `embedding` (`vector_cosine_ops`) is for **vector search**. It's a multi-layer graph of vectors that finds **approximate** nearest neighbours by walking the graph instead of comparing the query with every row. It's fast at scale, but it can occasionally miss a true neighbour. `ORDER BY embedding <=> query_vec LIMIT k` uses it; `<=>` is cosine distance, and similarity = `1 - distance`.
+- **GIN** on `tsv` is for **keyword search**, an inverted index (word → rows), like the index at the back of a book. `WHERE tsv @@ websearch_to_tsquery('english', …)`, ranked with `ts_rank_cd`.
+
+### 3. You ran `EXPLAIN` on a vector query and Postgres didn't use the HNSW index. Why? Is that a problem?
+
+**Answer.** The plan was `Seq Scan` + `Sort` over 292 rows. The **query planner** estimated that computing 292 distances and sorting them is cheaper than walking the HNSW graph, and at this size that's correct (well under a millisecond). It's not a problem. The index pays off at tens of thousands of rows and beyond, where a sequential scan computes every distance on every query. With `SET enable_seqscan = off` (for learning only) the plan switches to `Index Scan using chunks_embedding_hnsw`.
+
+**Exact vs approximate search:** a sequential scan is **exact** (true top-k) but O(n); HNSW is **approximate** but sub-linear. The trade-off is tuned with HNSW parameters (`m`, `ef_construction`, and `hnsw.ef_search` at query time): higher values give better recall but are slower.
+
+### 4. What did you notice about the similarity scores?
+
+**Answer.** The nearest neighbours of `art-5-0` scored 0.909, 0.909, 0.894 and 0.887, all bunched together, because everything in the corpus is legal text about AI and the vectors point in similar directions. Consequences:
+
+- **Absolute similarity thresholds are fragile.** Ranking is what's reliable, which is one reason **RRF fuses ranks, not scores**.
+- A **semantic cache** needs a strict threshold (0.95 in Phase 7), or loosely related questions would get cached answers.
+- Nice semantic result: `art-99-2` (penalties) is a near neighbour of Article 5 (prohibited practices), because Article 99 sets the fines for violating Article 5. The embeddings captured a legal link with little shared vocabulary.
+
+### 5. Write a query: which provisions are split into the most chunks?
+
+```sql
+SELECT provision_id, title, count(*) AS n_chunks
+FROM chunks
+GROUP BY provision_id, title
+ORDER BY n_chunks DESC
+LIMIT 5;
+```
+
+Every non-aggregated column in `SELECT` must be in `GROUP BY`. Logical execution order: `FROM → WHERE → GROUP BY → SELECT → ORDER BY → LIMIT`, which is why `ORDER BY` can use the `n_chunks` alias. Long provisions (Article 3 with its definitions, Annex III) have many chunks, and that's exactly where de-duplicating by `provision_id` instead of chunk `id` would have lost the most context.
+
+---
+
+## Phase 5 · Multi-agent orchestration with LangGraph
+
+### 1. Describe your assessment pipeline. Why LangGraph instead of plain function calls?
+
+**Answer.** It's a graph over one shared state (a `TypedDict`):
+
+```
+START → intake ─(info missing, no answers yet)→ clarify → END
+          └→ screen ─┬→ classify ─────┐
+                     └→ ml_prescreen ─┴→ obligations → gaps → write → verify ─(failed, < 3)→ write
+                                                                        └─(passed / out of tries)→ finish → END
+```
+
+Each **node** is a small function that reads the state and returns only the keys it changes. **Edges** fix the order; **conditional edges** call a router function (`route_after_intake`, `route_after_verify`) to choose the next node.
+
+**Why a graph framework:** the pipeline has **branches** (clarify vs continue), **parallel work** (fan-out/fan-in), and a **loop** (write ↔ verify). LangGraph declares these explicitly and adds persistence/checkpointing (pause for human input and resume), streaming progress events, and an inspectable structure. For a straight sequence of steps, plain functions would be simpler, and I'd use them.
+
+### 2. How do parallel branches work, and what's the fan-in pitfall?
+
+**Answer.** Two edges out of `screen` (to `classify`, an LLM call, and `ml_prescreen`, a scikit-learn model) make them run **concurrently**, because neither needs the other's output. They're joined with **one list edge**: `g.add_edge(["classify", "ml_prescreen"], "obligations")`, so `obligations` **waits for both**. With two separate edges into `obligations`, it could run once per incoming branch. Afterwards, the obligations node compares the two: if the ML model's Annex III area disagrees with the LLM's, it adds `ml_disagrees_with_llm`, a cheap second opinion.
+
+### 3. Explain the evaluator–optimiser loop and how you keep it safe.
+
+**Answer.** The **writer** (LLM) drafts the report; the **verifier** (code) checks it: citations exist in the corpus, the classification is stated, every obligation deadline appears, and the disclaimer is present. If it fails, the conditional edge sends the **issues back to the writer as feedback** and it retries.
+
+Safety:
+
+- **Bounded:** `route_after_verify` returns `"finish"` once `attempts >= MAX_WRITE_ATTEMPTS` (3). An unbounded agent loop can spin forever, and each iteration is a paid LLM call. **Always cap agent loops.**
+- **Collect all issues at once** rather than returning on the first one. My first version returned early, and a report with 4 problems would have needed 4 retries with only 3 allowed, so it could never pass.
+- **Deterministic evaluator:** free, instant and reproducible, unlike an LLM-as-judge. An LLM judge is for fuzzy qualities (tone, completeness); code is for hard invariants.
+
+### 4. Which parts of the pipeline use an LLM and which don't? Why?
+
+**Answer.** LLM: **intake** (free text → structured profile), **classify** (legal judgement with RAG), **write** (the report). Deterministic code: **rules screen**, **obligations** (a lookup in a curated `obligations.yaml`), **gaps** (dates and priorities), **verify**, and routing. The principle: *when the answer must be exact and auditable, look it up; don't generate it.* Legal duties and deadlines must never be hallucinated, so they come from a reviewed table, and the LLM only explains them.
+
+### 5. How does human-in-the-loop work without trapping the user?
+
+**Answer.** If the intake finds missing facts and the user hasn't answered yet, `route_after_intake` goes to `clarify`: the job ends with `status="needs_input"` and returns questions. When the user answers, the pipeline **reruns from the start** with `answers` filled in, and the router then proceeds **even if some details are still missing**. Asking again straight away would trap the user in a loop of questions. Missing information lowers the assessment's confidence instead (the Phase 4 confidence cap).
+
+### 6. Gap prioritisation: how do you rank what to fix first?
+
+**Answer.** Per obligation: status from the user's self-assessment (`yes → in_place`, `partial`, `no → missing`, else `unknown`). Priority: **low** if in place; **high** if it already applies and is missing or unknown, or applies within 365 days and is missing; otherwise **medium**. Sorted by `(ORDER[priority], applies_from, obligation_id)` with `ORDER = {"high": 0, "medium": 1, "low": 2}`, because sorting the strings alphabetically gives *high, low, medium*.
+
+**Bugs I made and fixed:**
+
+- `today.replace(year=today.year + 1)` crashes on **29 February** (`ValueError`), and "a year" is 365 or 366 days. I switched to `(deadline - today).days <= 365`. Date logic is testable because `today` is a parameter, not `date.today()` inside the function.
+- Building `Gap(obligation=ob)` when the model wants `obligation_id`, `title`, `applies_from`. Pydantic's `ValidationError` lists every missing field, so read it field by field.
+- Background-job failures show up as `status: "failed"` rather than a traceback: the job runner catches exceptions so a bad job never takes down the API. That's good for production, but when debugging you have to find the real exception elsewhere.

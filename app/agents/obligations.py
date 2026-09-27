@@ -13,7 +13,9 @@ import yaml
 
 from app.agents.schemas import Obligation, RiskAssessment
 
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "obligations.yaml")
+DATA = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "obligations.yaml"
+)
 
 
 @lru_cache
@@ -32,5 +34,17 @@ def lookup(assessment: RiskAssessment, table: list[dict] | None = None) -> list[
       (when the role is unclear we show both sides rather than hide duties)
     Build Obligation objects from the entries (ignore the "categories" key).
     """
-    # YOUR CODE
-    raise NotImplementedError
+    if table is None:
+        table = load_table()
+    obligations = []
+    for entry in table:
+        if (
+            (assessment.category in entry["categories"])
+            or ("transparency" in entry["categories"] and assessment.transparency_obligations)
+        ) and (
+            entry["applies_to"] == "all"
+            or entry["applies_to"] == assessment.role
+            or assessment.role in ("both", "unknown")
+        ):
+            obligations.append(Obligation(**{k: v for k, v in entry.items() if k != "categories"}))
+    return obligations

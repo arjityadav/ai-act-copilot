@@ -11,12 +11,18 @@ from __future__ import annotations
 
 from app.agents.schemas import Obligation, Report, RiskAssessment, VerificationResult
 
-CATEGORY_WORDS = {"prohibited": "prohibited", "high_risk": "high-risk", "limited_risk": "limited",
-                  "minimal_risk": "minimal", "gpai": "general-purpose"}
+CATEGORY_WORDS = {
+    "prohibited": "prohibited",
+    "high_risk": "high-risk",
+    "limited_risk": "limited",
+    "minimal_risk": "minimal",
+    "gpai": "general-purpose",
+}
 
 
-def verify_report(report: Report, assessment: RiskAssessment, obligations: list[Obligation],
-                  known_provisions: set[str]) -> VerificationResult:
+def verify_report(
+    report: Report, assessment: RiskAssessment, obligations: list[Obligation], known_provisions: set[str]
+) -> VerificationResult:
     """Collect human-readable issues (strings); passed = no issues.
 
     1. Every id in report.cited_provisions must be in known_provisions (the ingested corpus's
@@ -29,5 +35,18 @@ def verify_report(report: Report, assessment: RiskAssessment, obligations: list[
     4. The report must contain the word "disclaimer" and the phrase "not legal advice" (case-insensitive).
        Issue: "Missing disclaimer"
     """
-    # YOUR CODE
-    raise NotImplementedError
+    issues: list[str] = []
+    for pid in report.cited_provisions:
+        if pid not in known_provisions:
+            issues.append(f"Cites {pid}, which is not in the regulation text")
+    word = CATEGORY_WORDS[assessment.category]
+    report_markdown = report.markdown.lower()
+    if word not in report_markdown:
+        issues.append(f"Does not state the classification ({word})")
+    s = report_markdown
+    for ob in obligations:
+        if ob.applies_from not in s:
+            issues.append(f"Missing deadline {ob.applies_from} for '{ob.title}'")
+    if "disclaimer" not in s or "not legal advice" not in s:
+        issues.append("Missing disclaimer")
+    return VerificationResult(passed=not issues, issues=issues)

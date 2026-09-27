@@ -463,3 +463,63 @@ What I observed in Redis: `rq:workers` and `rq:worker:<id>` (worker registration
 ### 5. Why does answering a clarifying question create a new assessment instead of updating the old one?
 
 **Answer.** `POST /assessments/{id}/answers` starts a **new run** (with `previous` pointing at the old id) containing the original input plus the answers. It gives an **audit trail**: the original run and its questions stay unchanged, which matters for a compliance tool ("what did the system know, and when"). It's also simpler: there's no half-finished graph to pause and resume; the pipeline reruns from `START` and the router sees answers present. The trade-off is one extra LLM call, because intake runs again.
+
+---
+
+## Phase 6 · MLOps: classifier, registry gate, drift
+
+### 1. Why is there a classic ML model inside an LLM product?
+
+**Answer.** A TF-IDF + logistic regression classifier predicts the **Annex III area** from the description in **milliseconds**, for free, and **deterministically**. It runs **in parallel** with the LLM classifier as an **independent second opinion**: if the two disagree, the assessment gets `ml_disagrees_with_llm` for human review. A real case from my project: the LLM intake labelled a CV-ranking tool `annex_iii_area: "none"` (it's Annex III employment), and that error cascaded through the rules screen. An independent model is exactly the check that catches it. It also gives a full MLOps lifecycle to operate: versioned data, tracked experiments, a registry with a promotion gate, drift monitoring and retraining.
+
+### 2. Explain your model. What do TF-IDF, `C` and `class_weight="balanced"` do?
+
+**Answer.**
+
+- **TF-IDF** turns text into a vector of word/bigram scores: high when a term is frequent **in this text** but rare **across all texts** ("recruitment"), near zero for words that appear everywhere ("the"). `ngram_range=(1,2)` adds word pairs ("credit score"); `sublinear_tf` uses log counts so repetition doesn't dominate.
+- **Logistic regression** learns a weight per feature per class and picks the highest-scoring class. It's fast and **explainable**: you can inspect which words drove a prediction.
+- **`C`** is inverse regularisation strength: smaller C means simpler weights and less **overfitting**.
+- **`class_weight="balanced"`** up-weights rare classes so the model doesn't just predict the majority class.
+- A scikit-learn **`Pipeline`** chains them, so the TF-IDF vocabulary is fitted **only on training data**, which avoids **data leakage** from the test set. The split is **stratified** so every label appears in both train and test.
+
+### 3. Why macro F1 instead of accuracy?
+
+**Answer.** With imbalanced classes, accuracy misleads: if 90% of examples are `none`, always predicting `none` scores 90% and is useless. **F1** per class combines **precision** (when it predicts *employment*, is it right?) and **recall** (of all *employment* cases, how many did it find?). **Macro** F1 averages over classes **equally**, so failing a rare class hurts the score. For a compliance tool, missing a rare high-risk area (e.g. law enforcement) is the costly error, so I also log **per-class F1**.
+
+### 4. What is your promotion gate and why is each rule there?
+
+**Answer.** A newly trained model (**candidate**) replaces production (**champion**, an MLflow registry **alias**) only if, in order:
+
+1. **macro F1 ≥ 0.70:** an absolute quality floor, which applies even to the **first** model (so this check comes before "no champion yet").
+2. No champion → promote ("first model").
+3. **Beats the champion by ≥ 0.01:** smaller gains on a small test set are likely **noise** from the split; this avoids flip-flopping between models.
+4. **No class drops by more than 0.10:** the average can improve while one class gets much worse. **Averages hide failures.** Silently getting worse at spotting one high-risk area isn't acceptable.
+5. Otherwise promote.
+
+It's the MLOps equivalent of code review: no model reaches production because someone happened to run a script. Rollback = move the alias back to the previous version.
+
+### 5. What is drift, and how do you detect it?
+
+**Answer.** **Data drift**: production inputs stop resembling the training data (longer texts, a different language, new kinds of systems). The model degrades **silently**, with no errors. I use the **Population Stability Index**:
+
+`PSI = Σ (actual% − expected%) · ln(actual% / expected%)` over bins; **< 0.1 stable, 0.1–0.25 moderate, > 0.25 significant → investigate / retrain.**
+
+- **Numeric features** (e.g. description length): bin edges from the **training data's quantiles** (about equal-sized bins), de-duplicated with `np.unique`, outer edges set to **±∞** so out-of-range production values are counted (that's often where drift shows up), proportions **floored at a small ε** to avoid `ln(0)` and division by zero. Fully vectorised NumPy.
+- **Categorical** (predicted areas this week vs training labels): the same formula over the **union** of categories, since a category appearing only in production is itself drift.
+
+A weekly CI job (`drift.yml`) runs the check. Drift is a signal to **investigate**, not an automatic retrain: first look at the new inputs, label some, retrain, and let the promotion gate decide.
+
+**Limit to mention:** PSI detects **input** drift (covariate shift). **Concept drift** (the right label for the same input changes, e.g. the law is amended) needs fresh **labelled** data or evals to detect.
+
+### 6. Tell me about improving the model. What made the biggest difference?
+
+**Answer.** **Data, not the algorithm.**
+
+| Run | Data | macro F1 | Gate |
+|---|---|---|---|
+| v1 | 52 hand-written seed rows (~4 per class in training, 1–2 per class in test) | **0.22** | rejected: below 0.70 |
+| v2 | 250 rows after generating and **reviewing** synthetic data | **0.73** | promoted to champion |
+
+With 1–2 test examples per class, per-class F1 can only be 0, 0.5 or 1, so v1's metrics were mostly noise, and tuning `C` couldn't fix that. I generated 270 synthetic descriptions with `llama3.1:8b`, then reviewed every row: **43 relabelled, 72 removed** (32 ambiguous, 40 near-duplicates at TF-IDF cosine ≥ 0.7). The generator labelled by **keywords**, not by the law: e.g. facial **verification** labelled *biometrics* (1:1 verification is excluded from Annex III 1(a)), emotion analysis of **chat text** (not biometric data), travel-document verification as *migration* (excluded in Annex III 7(d)). Near-duplicates matter because a copy in training and one in testing **inflates** the test score (leakage). Every change and its reason is recorded, and the model card documents it.
+
+**Honest weaknesses:** biometrics F1 0.40 and migration 0.57 (13–14 examples each, so noisy); `none` 0.63, as the catch-all class it absorbs confusion. Train and test are both LLM-generated with a narrow, marketing-like style, so **0.73 likely overestimates** performance on real user descriptions. The next step is a small **hand-written test set of real descriptions**, which would be worth more than hundreds of synthetic rows.

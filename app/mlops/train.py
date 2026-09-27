@@ -22,12 +22,15 @@ from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
-DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "training")
+DATA = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "training"
+)
 
 
 def load_dataset(path: str | None = None):
     """(given) -> (texts, labels) as lists."""
     import csv
+
     path = path or os.path.join(DATA, "annex3.csv")
     if not os.path.exists(path):
         path = os.path.join(DATA, "annex3_seed.csv")
@@ -46,15 +49,25 @@ def build_pipeline(C: float = 4.0) -> Pipeline:
     - "tfidf": TfidfVectorizer(ngram_range=(1, 2), sublinear_tf=True, min_df=1)
     - "clf":   LogisticRegression(C=C, max_iter=2000, class_weight="balanced")
     """
-    # YOUR CODE
-    raise NotImplementedError
+    tfidf = TfidfVectorizer(ngram_range=(1, 2), sublinear_tf=True, min_df=1)
+    clf = LogisticRegression(C=C, max_iter=2000, class_weight="balanced")
+    return Pipeline([("tfidf", tfidf), ("clf", clf)])
 
 
 def evaluate(model, texts, labels) -> dict:
     """Return {"macro_f1": ..., "accuracy": ..., "per_class_f1": {label: f1, ...}} as plain floats.
     Use f1_score(..., average="macro", zero_division=0) and f1_score(..., average=None, labels=sorted(set(labels)))."""
-    # YOUR CODE
-    raise NotImplementedError
+    pred = model.predict(texts)
+    macro_f1 = f1_score(labels, pred, average="macro", zero_division=0)
+    accuracy = accuracy_score(labels, pred)
+    per_class_f1 = f1_score(labels, pred, average=None, labels=sorted(set(labels)), zero_division=0)
+    return {
+        "macro_f1": float(macro_f1),
+        "accuracy": float(accuracy),
+        "per_class_f1": {
+            label: float(f1) for label, f1 in zip(sorted(set(labels)), per_class_f1, strict=False)
+        },
+    }
 
 
 def train_and_log(C: float = 4.0, data_path: str | None = None, register: bool = True) -> dict:
@@ -73,13 +86,26 @@ def train_and_log(C: float = 4.0, data_path: str | None = None, register: bool =
         return info
     mlflow.set_experiment("annex3-classifier")
     with mlflow.start_run() as run:
-        mlflow.log_params({"C": C, "n_train": len(X_tr), "n_test": len(X_te), "labels": len(set(labels)),
-                           "data_path": data_path or "default"})
-        mlflow.log_metrics({"macro_f1": metrics["macro_f1"], "accuracy": metrics["accuracy"],
-                            **{f"f1_{k}": v for k, v in metrics["per_class_f1"].items()}})
+        mlflow.log_params(
+            {
+                "C": C,
+                "n_train": len(X_tr),
+                "n_test": len(X_te),
+                "labels": len(set(labels)),
+                "data_path": data_path or "default",
+            }
+        )
+        mlflow.log_metrics(
+            {
+                "macro_f1": metrics["macro_f1"],
+                "accuracy": metrics["accuracy"],
+                **{f"f1_{k}": v for k, v in metrics["per_class_f1"].items()},
+            }
+        )
         name = "annex3-classifier" if register else None
-        logged = mlflow.sklearn.log_model(model, name="model", registered_model_name=name,
-                                          input_example=np.array(X_te[:2], dtype=object))
+        logged = mlflow.sklearn.log_model(
+            model, name="model", registered_model_name=name, input_example=np.array(X_te[:2], dtype=object)
+        )
         info["run_id"] = run.info.run_id
         info["version"] = getattr(logged, "registered_model_version", None)
     return info

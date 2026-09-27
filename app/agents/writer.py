@@ -1,4 +1,4 @@
-"""Report writer agent (given): turns the structured results into a readable Markdown report."""
+"""Report writer agent (given): turns the structured results into a readable Markdown report. The disclaimer is appended in code, not generated."""
 
 from __future__ import annotations
 
@@ -9,6 +9,11 @@ from app.agents.schemas import Gap, Obligation, Report, RiskAssessment, SystemPr
 from app.llmops.prompts import get_prompt
 
 CITE_RE = re.compile(r"\b(Article|Art\.)\s+(\d+[a-z]?)|\bAnnex\s+([IVXLC]+)\b")
+DISCLAIMER = (
+    "## Disclaimer\n"
+    "This report is decision support, not legal advice. "
+    "A qualified person must review it before you rely on it."
+)
 
 
 def cited_provisions(markdown: str) -> list[str]:
@@ -21,13 +26,33 @@ def cited_provisions(markdown: str) -> list[str]:
     return out
 
 
-def write_report(profile: SystemProfile, assessment: RiskAssessment, obligations: list[Obligation],
-                 gaps: list[Gap], provider, feedback: list[str] | None = None) -> Report:
-    payload = {"profile": profile.model_dump(), "classification": assessment.model_dump(),
-               "obligations": [o.model_dump() for o in obligations], "gaps": [g.model_dump() for g in gaps]}
+def write_report(
+    profile: SystemProfile,
+    assessment: RiskAssessment,
+    obligations: list[Obligation],
+    gaps: list[Gap],
+    provider,
+    feedback: list[str] | None = None,
+) -> Report:
+    payload = {
+        "profile": profile.model_dump(),
+        "classification": assessment.model_dump(),
+        "obligations": [o.model_dump() for o in obligations],
+        "gaps": [g.model_dump() for g in gaps],
+    }
     content = "<input>\n" + json.dumps(payload, indent=2, ensure_ascii=False) + "\n</input>"
     if feedback:
         content += "\n\nA reviewer rejected the previous draft. Fix these issues:\n- " + "\n- ".join(feedback)
-    result = provider.complete([{"role": "user", "content": content}], system=get_prompt("writer").system,
-                               temperature=0.2, max_tokens=2500)
-    return Report(markdown=result.text, cited_provisions=cited_provisions(result.text))
+    result = provider.complete(
+        [{"role": "user", "content": content}],
+        system=get_prompt("writer").system,
+        temperature=0.2,
+        max_tokens=2500,
+    )
+
+    text = result.text
+    pos = text.find("## Disclaimer")
+    if pos != -1:
+        text = text[:pos]
+    markdown = text.rstrip() + "\n\n" + DISCLAIMER
+    return Report(markdown=markdown, cited_provisions=cited_provisions(markdown))

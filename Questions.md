@@ -403,3 +403,25 @@ Safety:
 - `today.replace(year=today.year + 1)` crashes on **29 February** (`ValueError`), and "a year" is 365 or 366 days. I switched to `(deadline - today).days <= 365`. Date logic is testable because `today` is a parameter, not `date.today()` inside the function.
 - Building `Gap(obligation=ob)` when the model wants `obligation_id`, `title`, `applies_from`. Pydantic's `ValidationError` lists every missing field, so read it field by field.
 - Background-job failures show up as `status: "failed"` rather than a traceback: the job runner catches exceptions so a bad job never takes down the API. That's good for production, but when debugging you have to find the real exception elsewhere.
+
+### 7. Tell me about an improvement you made based on error analysis.
+
+**Answer.** I ran a real assessment (a CV-ranking tool, `llama3.1:8b` locally) and read the event stream and the full result instead of only checking the final label.
+
+**What I found:**
+
+- The verifier rejected the report **3 times** with "Missing disclaimer", but the report *had* a disclaimer: the model wrote "not **intended to be** legal advice" and my check looked for the exact substring "not legal advice". The writer kept paraphrasing, so the loop hit its cap and a correct report was delivered marked as failed. It's the same class of bug as my Phase 3 exact-string refusal check.
+- The category was right (**high-risk**) but for the **wrong reason**: the reasoning used the Article 6(1) Annex I product-safety route instead of Article 6(2) + **Annex III point 4 (employment)**, with **zero citations** and invented flags. The root cause was the intake agent setting `annex_iii_area: "none"`: an early error that cascaded, because the rules screen then raised no Annex III flag. The classifier recovered the category only because query planning always searches Article 6 plus the system's own purpose text.
+- The report included a **fabricated quote** attributed to Article 4.
+
+**The fix:** the disclaimer is fixed text, so I **append it in code** after the writer runs (removing any disclaimer the model wrote) instead of asking the LLM to produce it. *When the text must be exact, don't generate it.*
+
+**Result (same input, before → after):**
+
+| | Before | After |
+|---|---|---|
+| Write/verify attempts | 3 (all failed) | **1 (passed)** |
+| Write + verify stage | 4 min 39 s | **1 min 33 s** (−67%) |
+| Whole assessment | 5 min 29 s | **2 min 22 s** (−57%) |
+
+**Open items this analysis surfaced:** evals must check the Annex III area and the citations, not just the category ("right for the wrong reason" is a failure); cap confidence when a high-risk result has no citations; check quoted text against the corpus; mark results that hit the retry cap as `done_with_issues` instead of `done`; give the writer actionable feedback (name the exact requirement); and use a stronger model in production.

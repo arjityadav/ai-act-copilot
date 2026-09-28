@@ -1,0 +1,109 @@
+# Production stack for a single small Linux VM (AWS EC2 free plan, Oracle Always Free, Hetzner...).
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# Differences from docker-compose.yml (dev):
+#   - Caddy in front: automatic HTTPS (Let's Encrypt) on ports 80/443; nothing else is published
+#   - Postgres and Redis are NOT exposed to the internet (no "ports:")
+#   - APP_ENV=prod: the API refuses to start without API_KEY
+#   - the LLM comes from a hosted API (LLM_PROVIDERS, OpenAI-compatible via OPENAI_BASE_URL);
+#     Ollama runs on CPU for embeddings only (nomic-embed-text is small)
+#   - one uvicorn process and memory limits, sized for a 2 GB machine (+ swap)
+#   - MLflow, Prometheus and Grafana are left out to save memory; the ML pre-screen uses the
+#     local model file data/models/annex3.joblib if you copy it to the server (optional)
+
+x-app-env: &app-env
+  APP_ENV: prod
+  DATABASE_URL: postgresql://copilot:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/copilot
+  REDIS_URL: redis://redis:6379/0
+  OLLAMA_HOST: http://ollama:11434
+  LLM_PROVIDERS: ${LLM_PROVIDERS:?set LLM_PROVIDERS, e.g. openai}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+  LLM_TIMEOUT_S: ${LLM_TIMEOUT_S:-120}
+  API_KEY: ${API_KEY:?set API_KEY}
+  JOB_MODE: queue
+  STORE: postgres
+  # No MLflow server in production: a local file store makes the registry lookup fail instantly
+  # (instead of retrying HTTP), so serving falls back to data/models/annex3.joblib or skips the ML step.
+  MLFLOW_TRACKING_URI: file:///tmp/no-mlflow
+
+services:
+  caddy:
+    image: caddy:2
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN, e.g. 203-0-113-10.sslip.io}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [api]
+    restart: unless-stopped
+
+  api:
+    build: .
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers",
+              "--forwarded-allow-ips", "*"]
+    environment: *app-env
+    volumes:
+      - ./data/models:/app/data/models:ro
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    mem_limit: 700m
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["rq", "worker", "assessments", "--url", "redis://redis:6379/0"]
+    environment: *app-env
+    volumes:
+      - ./data/models:/app/data/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import redis; redis.Redis.from_url('redis://redis:6379/0').ping()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    mem_limit: 700m
+    restart: unless-stopped
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: copilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: copilot
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copilot"]
+      interval: 5s
+      retries: 10
+    mem_limit: 300m
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]   # persist the queue across restarts
+    volumes: ["redisdata:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+    mem_limit: 100m
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes: ["ollama:/root/.ollama"]
+    mem_limit: 900m
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  ollama:
+  caddy_data:

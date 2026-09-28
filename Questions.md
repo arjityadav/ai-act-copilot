@@ -632,3 +632,41 @@ Measured on the 9 affected scenarios: **transparency accuracy 0% → 100%**, cat
 - it also revealed a **production bug**: with Postgres, a non-UUID id returned **500** instead of **404**, and would have counted as a server error in the new metrics. `PostgresRepo.get` now validates the id and returns `None` (404), with a test that proves no database connection is attempted.
 
 **Lesson:** a test that passes or fails depending on what ran before it is hiding something. Here it was hiding a real bug.
+
+---
+
+## Phase 8 · CI/CD with GitHub Actions
+
+### 6. Describe your CI pipeline.
+
+**Answer.** On every push to `main` and every pull request, GitHub Actions runs jobs **in parallel where possible**:
+
+| Job | What it does |
+|---|---|
+| **lint** | `ruff check .` + `ruff format --check .` on the **whole repo** |
+| **test** | 63 unit tests with fakes, no services (~50 s) |
+| **integration** | real **Postgres (pgvector) + Redis as service containers**: migrations, store round-trip, repo, queue |
+| **docker** | builds the production image with a layer cache (`cache-from/to: gha`), no push on PRs |
+| **eval-gate** | on PRs that touch `prompts/`, `app/agents/`, `app/rag/` or `app/retrieval/` (path filter), runs the 20-scenario evals against the production model and **fails below an 80% pass rate**; posts the report as a PR comment. Skipped without an API key secret. |
+
+`integration`, `docker` and `eval-gate` depend on `test` (`needs:`), so broken code fails fast and cheap. `concurrency` cancels superseded runs on the same branch. **CD** (`cd.yml`) triggers on a successful CI run on `main`: build and push the image to GHCR tagged with the commit SHA, deploy, smoke-test `/health`; rollback = redeploy the previous SHA.
+
+**Why an eval gate?** Unit tests prove the code runs; they can't catch a prompt change that makes the model worse. In my project, a fix that looked good on one scenario silently made another worse (s09), and only the eval caught it. The gate makes that check automatic, and the path filter keeps paid LLM calls to PRs that can actually affect quality.
+
+### 7. Tell me about getting CI green. What went wrong?
+
+**Answer.** Three problems, each a general lesson:
+
+1. **CI had never run.** The workflow triggered on `branches: [main]`, but my repo used `master`. The Actions page was simply empty, and I read "no failures" as "working" when **nothing was being checked**. I renamed the branch to `main` (and the default branch on GitHub).
+2. **Pre-commit checked only staged files; CI checks the whole repo.** 31 provided files had never been formatted and 5 lint errors had never been caught. I did one mechanical formatting commit (kept separate so real changes stay reviewable) and fixed `zip()` without `strict=True`, where a chunk/embedding count mismatch would have **silently dropped** chunks.
+3. **Two versions of the same tool.** The pre-commit hook pinned ruff **0.6.9**; `uv.lock` (used by CI) had **0.16.9**. They format `assert …, "msg"` differently, so the hook rewrote files at commit time and CI then rejected them. The two formatters kept undoing each other's work. Fix: pin the hook to the lockfile's version and verify with `pre-commit run --all-files`. **Pin each tool version in one place, or keep every copy in sync.**
+
+First fully green run: lint ✓, test ✓, integration ✓, docker ✓ (eval-gate skipped: push, not PR).
+
+**Follow-ups CI itself flagged:** actions running on deprecated Node.js 20 (bump `actions/checkout`, `astral-sh/setup-uv` to their current majors), and `ubuntu-latest` moving to a new Ubuntu release (pin `ubuntu-24.04` for reproducible builds, the same pinning lesson).
+
+### 8. Have you ever rewritten Git history? When is it OK?
+
+**Answer.** Once, on this solo repo: 15 commits had a machine-local author email (`user@hostname.local`), so GitHub didn't link them to my account, and I wanted a local-only file (`CLAUDE.md`) out of the history. I used `git filter-branch` (email mapping, message filter, index filter to drop the file), made a **backup branch** first, verified that the code diff against the backup was empty (apart from the removed file), and pushed with **`--force-with-lease`**, which refuses to overwrite remote work you haven't seen.
+
+It's OK when **nobody else depends on the history** (a solo repo or unshared branch). On shared branches, never: everyone's clones break. Also, a force push doesn't instantly erase old commits from GitHub; anyone with an old hash can still fetch them for a while. For a leaked **secret**, rewriting isn't enough: **rotate the secret** first.

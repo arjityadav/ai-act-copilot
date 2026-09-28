@@ -28,7 +28,10 @@ def test_lookup_high_risk_provider_vs_deployer():
 
 
 def test_lookup_other_categories():
-    assert ids(obligations.lookup(A(category="prohibited", role="provider"))) == ["ai_literacy", "stop_prohibited"]
+    assert ids(obligations.lookup(A(category="prohibited", role="provider"))) == [
+        "ai_literacy",
+        "stop_prohibited",
+    ]
     lim = ids(obligations.lookup(A(category="limited_risk", transparency_obligations=True)))
     assert "transparency_disclosure" in lim and "voluntary_codes" in lim
     assert "transparency_disclosure" not in ids(obligations.lookup(A(category="minimal_risk")))
@@ -37,7 +40,14 @@ def test_lookup_other_categories():
 
 
 def ob(i, applies_from):
-    return Obligation(id=i, title=i.title(), articles=["art-9"], applies_to="provider", applies_from=applies_from, description="")
+    return Obligation(
+        id=i,
+        title=i.title(),
+        articles=["art-9"],
+        applies_to="provider",
+        applies_from=applies_from,
+        description="",
+    )
 
 
 def test_find_gaps_status_priority_and_order():
@@ -56,8 +66,11 @@ def test_find_gaps_status_priority_and_order():
 def test_verify_report():
     known = {"art-6", "annex-iii", "art-9"}
     obs = [ob("risk", "2027-12-02")]
-    good = Report(markdown="## Summary\nThis is a high-risk system (Article 6, Annex III). Deadline 2027-12-02.\n"
-                           "## Disclaimer\nDecision support, not legal advice.", cited_provisions=["art-6", "annex-iii"])
+    good = Report(
+        markdown="## Summary\nThis is a high-risk system (Article 6, Annex III). Deadline 2027-12-02.\n"
+        "## Disclaimer\nDecision support, not legal advice.",
+        cited_provisions=["art-6", "annex-iii"],
+    )
     assert verifier.verify_report(good, A(), obs, known).passed
     bad = Report(markdown="Minimal stuff under Article 77.", cited_provisions=["art-77"])
     issues = verifier.verify_report(bad, A(), obs, known).issues
@@ -69,6 +82,7 @@ def test_verify_report():
 
 def test_routing():
     from app.agents.schemas import SystemProfile
+
     p = SystemProfile.model_validate_json(profile_json(missing_info=["Who uses it?"]))
     assert graph.route_after_intake({"profile": p, "answers": {}}) == "clarify"
     assert graph.route_after_intake({"profile": p, "answers": {"Who uses it?": "HR"}}) == "screen"
@@ -78,9 +92,11 @@ def test_routing():
     assert graph.route_after_verify({"verification": ok, "attempts": 1}) == "finish"
 
 
-GOOD_REPORT = ("## Summary\nThis high-risk system (Annex III, Article 6) is built by a provider.\n"
-               "## Obligations and deadlines\n- AI literacy: 2025-02-02\n- Everything else: 2027-12-02\n"
-               "## Disclaimer\nDecision support, not legal advice.")
+GOOD_REPORT = (
+    "## Summary\nThis high-risk system (Annex III, Article 6) is built by a provider.\n"
+    "## Obligations and deadlines\n- AI literacy: 2025-02-02\n- Everything else: 2027-12-02\n"
+    "## Disclaimer\nDecision support, not legal advice."
+)
 
 
 def scripted(reports):
@@ -95,13 +111,15 @@ def scripted(reports):
         if "compliance summary" in system:
             return reports.pop(0)
         raise AssertionError("unexpected prompt")
+
     return reply
 
 
 def deps_with(provider, events=None, ml=None):
     store, emb = small_corpus()
-    return graph.PipelineDeps(provider=provider, store=store, embedder=emb, events=events, ml_classifier=ml,
-                              today=date(2026, 10, 1))
+    return graph.PipelineDeps(
+        provider=provider, store=store, embedder=emb, events=events, ml_classifier=ml, today=date(2026, 10, 1)
+    )
 
 
 def test_graph_full_run_with_retry():
@@ -112,9 +130,14 @@ def test_graph_full_run_with_retry():
         def predict(self, text):
             return {"label": "education", "probability": 0.7}
 
-    deps = deps_with(FakeProvider(scripted(["Draft without the required parts.", GOOD_REPORT])),
-                     events=lambda s, m: events.append(s), ml=FakeML())
-    final = graph.run_pipeline({"description": "We build a CV ranking tool.", "answers": {}, "practices": {}}, deps)
+    deps = deps_with(
+        FakeProvider(scripted(["Draft without the required parts.", GOOD_REPORT])),
+        events=lambda s, m: events.append(s),
+        ml=FakeML(),
+    )
+    final = graph.run_pipeline(
+        {"description": "We build a CV ranking tool.", "answers": {}, "practices": {}}, deps
+    )
     assert final["status"] == "done" and final["verification"].passed and final["attempts"] == 2
     assert "ml_disagrees_with_llm" in final["assessment"].flags
     assert final["obligations"] and final["gaps"]
@@ -128,8 +151,9 @@ def test_graph_asks_for_clarification():
     def reply(messages, system):
         return profile_json(missing_info=["Do you develop it or buy it?"])
 
-    final = graph.run_pipeline({"description": "An AI tool.", "answers": {}, "practices": {}},
-                               deps_with(FakeProvider(reply)))
+    final = graph.run_pipeline(
+        {"description": "An AI tool.", "answers": {}, "practices": {}}, deps_with(FakeProvider(reply))
+    )
     assert final["status"] == "needs_input" and final["questions"] == ["Do you develop it or buy it?"]
     assert "assessment" not in final
 
@@ -144,8 +168,9 @@ def test_assessment_api_inline(monkeypatch=None):
 
     r = repo.InMemoryRepo()
     original = queue.build_deps
-    queue.build_deps = lambda rp, aid, settings=None: deps_with(FakeProvider(scripted([GOOD_REPORT])),
-                                                                events=lambda s, m: rp.add_event(aid, s, m))
+    queue.build_deps = lambda rp, aid, settings=None: deps_with(
+        FakeProvider(scripted([GOOD_REPORT])), events=lambda s, m: rp.add_event(aid, s, m)
+    )
     try:
         app = create_app()
         app.dependency_overrides[api_deps.assessments_dep] = lambda: r
@@ -158,3 +183,10 @@ def test_assessment_api_inline(monkeypatch=None):
         assert client.get("/assessments/nope").status_code == 404
     finally:
         queue.build_deps = original
+
+
+def test_postgres_repo_get_rejects_non_uuid_without_touching_the_db():
+    from app.jobs.repo import PostgresRepo
+
+    # the URL points nowhere: returning None proves no connection was attempted
+    assert PostgresRepo("postgresql://nobody@127.0.0.1:1/none").get("abc-123") is None

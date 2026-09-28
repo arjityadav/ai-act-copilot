@@ -593,3 +593,42 @@ Measured on the 9 affected scenarios: **transparency accuracy 0% → 100%**, cat
 **What I changed:** I kept the override for **prohibited** practices only. There, the costs are asymmetric: calling an illegal system "high-risk" is the worst outcome, and a false "prohibited" is visible and reviewable. For GPAI there's no such asymmetry and the input fact had been shown to be unreliable, so it only raises `rules_disagree_with_llm`. The code comment and a unit test record why.
 
 **Lessons:** (1) a rule-based override is only as reliable as the facts it's based on, and here those facts come from an LLM; (2) **measure every fix**, because without the before/after run the GPAI override looked like a clear win (s13 fixed) while silently making s09 worse; (3) overriding a model should be justified by the **cost asymmetry of errors**, not by convenience.
+
+---
+
+## Phase 8 · Observability: Prometheus metrics
+
+### 1. What do you monitor for an LLM API, and how?
+
+**Answer.** The **four golden signals**: **traffic** (requests/s), **errors** (5xx rate), **latency** (p95/p99 per route), **saturation** (how full workers, queues and connections are). For an LLM product, add **tokens, cost and LLM latency per provider/model**, because cost scales with usage and a slow provider dominates latency (my assessments spent about 85% of their time in LLM calls).
+
+**How:** the API exposes `GET /metrics`; **Prometheus pulls** (scrapes) it every 15 s and stores the history; **Grafana** charts it with PromQL, e.g. `histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket[5m])))` for p95 latency per route.
+
+### 2. Counter vs histogram, and what is label cardinality?
+
+**Answer.** A **counter** only goes up (requests, tokens, dollars); you query its **rate**. A **histogram** counts observations into **buckets**, so Prometheus can estimate **percentiles**. Averages hide tail latency, so percentiles are what you alert on.
+
+**Labels** split a metric into time series (`method`, `route`, `status`). **Every unique label combination is its own series**, so labels must have **bounded** values. That's why the route label is the **template** `/assessments/{aid}`, not the raw path: a UUID per request would create unbounded series and eventually take Prometheus down. Never label with ids, user input or free text.
+
+### 3. How does your metrics middleware work?
+
+**Answer.** It wraps every request: skip `/metrics` itself (so scrapes don't count as traffic), start a `perf_counter`, `await call_next(request)` in a `try`; `except` sets status `"500"` and **re-raises**; `finally` records the request counter and latency histogram **on both paths**; then return the response. The route label is read **after** `call_next`, because routing happens inside it; before that there's no route in the request scope. LLM metrics are recorded in the provider wrapper (`TracedProvider`) from each `LLMResult`: input/output tokens, `cost_usd`, `latency_s`.
+
+**Bugs I made:** forgetting `return response` after `try/finally` (every request broke, because a function without `return` returns `None`), and guessing field names (`result.cost` vs `cost_usd`, `latency` vs `latency_s`). Read the dataclass definition instead of guessing.
+
+### 4. What are the gaps in this monitoring setup?
+
+**Answer.**
+
+1. **The worker isn't scraped.** Prometheus only scrapes `api:8000`, but assessments (the most expensive LLM workload) run in the **worker**, whose counters live in its own process memory. Fix: expose a metrics port on the worker (`start_http_server`) and add a scrape target, or use the **Pushgateway** for batch jobs.
+2. **Multiple processes per container.** uvicorn runs `--workers 2`, each with its own registry; a scrape reaches one at random, so counters appear to jump. Fix: `prometheus_client` **multiprocess mode**, or one process per container and scale containers (the usual choice on Kubernetes).
+3. **No alerts yet.** Dashboards need someone watching; alert rules (error rate > 5% for 5 min, p95 > threshold, daily cost > budget) turn metrics into action.
+
+### 5. Tell me about a flaky or order-dependent test you fixed.
+
+**Answer.** A Phase 8 test failed when run alone but passed in the full suite. Root cause: the test environment (`STORE=memory`, `APP_ENV=test`) was set in `tests/helpers.py`, which only ran when a test file **imported** it. The Phase 8 file didn't, so on its own it used the **real Postgres** running locally, and `GET /assessments/abc-123` failed with "invalid input syntax for type uuid". Fixes:
+
+- moved the environment setup to **`tests/conftest.py`**, which pytest loads before any test, so **no test depends on the order**
+- it also revealed a **production bug**: with Postgres, a non-UUID id returned **500** instead of **404**, and would have counted as a server error in the new metrics. `PostgresRepo.get` now validates the id and returns `None` (404), with a test that proves no database connection is attempted.
+
+**Lesson:** a test that passes or fails depending on what ran before it is hiding something. Here it was hiding a real bug.

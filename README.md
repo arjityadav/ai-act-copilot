@@ -6,6 +6,8 @@
 
 FastAPI · LangGraph · PostgreSQL + pgvector · Redis/RQ · Ollama / Claude / OpenAI · scikit-learn + MLflow · Docker · GitHub Actions · Prometheus + Grafana
 
+**Live demo:** [141.147.32.252.sslip.io/docs](https://141.147.32.252.sslip.io/docs), the interactive API docs (Swagger UI). The endpoints require an API key, available on request. Deployed on Oracle Cloud (Always Free, Frankfurt) with `openai/gpt-oss-120b` on Groq; see [docs/DEPLOY.md](docs/DEPLOY.md).
+
 > Decision support, not legal advice. Every answer cites the regulation; every report is verified in code and must be reviewed by a qualified person.
 
 <!-- TODO: demo GIF (an assessment streaming its progress events, or /chat answering with citations) -->
@@ -24,7 +26,8 @@ All numbers are measured on this repository, not estimated. Local runs use `llam
 | Retrieval recall@5 (25 questions over the ingested Act) | 0.42 (keyword only) | **0.90** (hybrid: pgvector + full-text + RRF) |
 | Retrieval MRR | 0.771 (vector only) | **0.788** (hybrid) |
 | Annex III classifier macro F1 (held-out 25%) | 0.22 (52 seed rows, rejected by the promotion gate) | **0.73** (250 reviewed rows, promoted to champion) |
-| End-to-end scenario pass rate (20 scenarios, `llama3.1:8b`) | **15%** | re-run after rule fixes pending; transparency accuracy on the affected scenarios 0% → **100%** |
+| End-to-end scenario pass rate (20 scenarios, `llama3.1:8b`) | **15%** | after rule fixes: transparency accuracy on the affected scenarios 0% → **100%**; full re-run pending |
+| Same pipeline with a larger hosted model (`openai/gpt-oss-120b` on Groq) | — | **3/3** on a spot check (s01, s03, s07; two of them failed or timed out with the 8B); full 20-scenario run pending |
 | Assessment wall time (same input, `llama3.1:8b`) | 5 min 29 s (3 report attempts) | **2 min 22 s** (1 attempt), −57% |
 | p95 `/chat` latency · cost per 1k questions | not measured yet (load test pending) | |
 
@@ -123,7 +126,7 @@ Built in phases on a structured starter template: the scaffolding (Docker/Compos
 | 5 | Obligations, gap analysis, verifier, LangGraph orchestration | ✅ |
 | 6 | MLOps: training data review, training, MLflow registry gate, drift | ✅ |
 | 7 | LLMOps: eval scoring, semantic cache, provider fallback | ✅ |
-| 8 | Prometheus metrics; CI/CD | ✅ · deployment and load test in progress |
+| 8 | Prometheus metrics; CI/CD; deployment (Oracle Cloud + Groq, HTTPS via Caddy) | ✅ · load test pending |
 | 9 | Results, docs, demo | in progress |
 
 ## Limitations and future work
@@ -133,7 +136,8 @@ Built in phases on a structured starter template: the scaffolding (Docker/Compos
 - **Classifier data.** Mostly LLM-generated and reviewed with AI assistance, not by a legal expert; scores likely overestimate performance on real descriptions. A hand-written test set of real descriptions is the next step.
 - **Reliability.** A worker killed mid-job leaves the assessment `running` (needs a reconciler or retries with idempotent jobs); a result that hits the retry cap is reported as `done` rather than `done_with_issues`.
 - **Observability.** Only the API is scraped; worker LLM metrics and multi-process counters need a worker metrics endpoint or multiprocess mode.
-- **Hardening.** Redis has no persistence volume in Compose; some images use `:latest` tags.
+- **Hosting.** The live demo runs on free tiers: Groq's free plan limits tokens per minute and per day, so heavy use can hit rate limits, and descriptions are sent to an external API (PII is redacted first). A production deployment would use a paid or EU-hosted provider with a data-processing agreement. Continuous deployment to the server isn't automated yet.
+- **Hardening.** Redis has no persistence volume in the dev Compose file (the production file enables it); some images use `:latest` tags.
 
 ## Repository layout
 

@@ -670,3 +670,43 @@ First fully green run: lint ✓, test ✓, integration ✓, docker ✓ (eval-gat
 **Answer.** Once, on this solo repo: 15 commits had a machine-local author email (`user@hostname.local`), so GitHub didn't link them to my account, and I wanted a local-only file (`CLAUDE.md`) out of the history. I used `git filter-branch` (email mapping, message filter, index filter to drop the file), made a **backup branch** first, verified that the code diff against the backup was empty (apart from the removed file), and pushed with **`--force-with-lease`**, which refuses to overwrite remote work you haven't seen.
 
 It's OK when **nobody else depends on the history** (a solo repo or unshared branch). On shared branches, never: everyone's clones break. Also, a force push doesn't instantly erase old commits from GitHub; anyone with an old hash can still fetch them for a while. For a leaked **secret**, rewriting isn't enough: **rotate the secret** first.
+
+---
+
+## Infrastructure I10 · Deployment (Oracle Cloud Always Free + Groq)
+
+### 1. How is your app deployed, and why this setup?
+
+**Answer.** One **Oracle Cloud Always Free** Ampere (ARM) VM in Frankfurt running `docker-compose.prod.yml`: **Caddy** (reverse proxy, automatic Let's Encrypt HTTPS) → FastAPI + RQ worker, with Postgres/pgvector, Redis (AOF persistence) and Ollama on CPU for **embeddings only**. The LLM is **Groq**'s free tier (`openai/gpt-oss-120b`) via its **OpenAI-compatible API**. No code change: the existing `OpenAIProvider` reads `OPENAI_BASE_URL`, which is the provider abstraction paying off.
+
+**Why:** $0 permanently, EU region, and enough RAM for the whole stack. A local 8B model on a CPU-only VM would be slow and weak (15% on my eval suite), while `gpt-oss-120b` passed 3/3 test scenarios, including two the 8B failed or timed out on. Trade-offs: free-tier rate limits (8k tokens/min, 200k/day), descriptions leave the server (PII is redacted first; a real deployment would check the provider's data-processing terms or use an EU provider), and a dependency on an external API (mitigated by the fallback chain).
+
+### 2. What's different between your dev and production setups?
+
+**Answer.**
+
+| | Dev (`docker-compose.yml`) | Prod (`docker-compose.prod.yml`) |
+|---|---|---|
+| Public ports | api 8000, db 5432, redis 6379, MLflow, Grafana… | **only 80/443 (Caddy)**; `docker ps` shows no `0.0.0.0:` for db/redis |
+| TLS | none | automatic HTTPS (Let's Encrypt via Caddy; `<ip>.sslip.io` as a free hostname) |
+| Auth | optional | `APP_ENV=prod`: the API **refuses to start** without `API_KEY` |
+| Secrets | `.env` | `.env.prod` on the server only; `.gitignore` covers `.env.*` except the example |
+| LLM | local Ollama | hosted API; Ollama for embeddings only |
+| Sizing | defaults | one uvicorn process, memory limits, Redis persistence |
+| Extras | MLflow, Prometheus, Grafana | left out; the MLflow lookup is pointed at a file store so it fails fast and serving falls back to a local model file |
+
+**A bug I caught before it happened:** `.gitignore` only listed `.env`, so a `.env.prod` with real keys would have been committed. I changed it to `.env.*` with `!.env.example`.
+
+### 3. Explain the network security of the deployment.
+
+**Answer.** Defence in depth, three layers:
+
+1. **Cloud firewall** (OCI Security List): inbound only TCP 80/443 from anywhere and 22 (SSH) restricted to my IP; stateful rules so replies are allowed automatically.
+2. **Host firewall** (iptables on the VM): Oracle's Ubuntu image rejects everything except SSH. I inserted ACCEPT rules for 80/443 **above** the REJECT rule, since iptables evaluates top-down and stops at the first match, and persisted them with `netfilter-persistent`. Forgetting this layer is the classic reason an Oracle VM "doesn't respond".
+3. **Docker publishing:** only Caddy publishes ports; the API, Postgres, Redis and Ollama are reachable only on Docker's internal network. The API itself requires an `X-API-Key`.
+
+**Debugging rule:** *connection refused* = the traffic arrived but nothing listens; *timeout* = a firewall dropped it.
+
+### 4. Why is port 80 open if everything is HTTPS?
+
+**Answer.** Let's Encrypt's HTTP-01 challenge verifies domain control on **port 80** before issuing a certificate, and Caddy uses 80 to **redirect** HTTP to HTTPS. `sslip.io` maps `130-61-1-2.sslip.io` to that IP via DNS, so a real certificate works without buying a domain.

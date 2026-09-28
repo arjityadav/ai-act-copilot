@@ -523,3 +523,73 @@ A weekly CI job (`drift.yml`) runs the check. Drift is a signal to **investigate
 With 1–2 test examples per class, per-class F1 can only be 0, 0.5 or 1, so v1's metrics were mostly noise, and tuning `C` couldn't fix that. I generated 270 synthetic descriptions with `llama3.1:8b`, then reviewed every row: **43 relabelled, 72 removed** (32 ambiguous, 40 near-duplicates at TF-IDF cosine ≥ 0.7). The generator labelled by **keywords**, not by the law: e.g. facial **verification** labelled *biometrics* (1:1 verification is excluded from Annex III 1(a)), emotion analysis of **chat text** (not biometric data), travel-document verification as *migration* (excluded in Annex III 7(d)). Near-duplicates matter because a copy in training and one in testing **inflates** the test score (leakage). Every change and its reason is recorded, and the model card documents it.
 
 **Honest weaknesses:** biometrics F1 0.40 and migration 0.57 (13–14 examples each, so noisy); `none` 0.63, as the catch-all class it absorbs confusion. Train and test are both LLM-generated with a narrow, marketing-like style, so **0.73 likely overestimates** performance on real user descriptions. The next step is a small **hand-written test set of real descriptions**, which would be worth more than hundreds of synthetic rows.
+
+---
+
+## Phase 7 · LLMOps: evals, semantic cache, provider fallback
+
+### 1. How do you evaluate an LLM system? What does "evals first" mean?
+
+**Answer.** You can't improve what you can't measure, and LLM output is non-deterministic, so a spot check proves little. I keep **20 labelled scenarios** (`evals/scenarios.jsonl`: description → expected category, Annex III area, transparency, must-cite provisions) and score the pipeline on all of them for **every** prompt, model or code change, in CI with a minimum pass rate as a **gate** (`--min-pass-rate`).
+
+Per scenario: `category_correct`, `area_correct`, `transparency_correct` (**`None` = not applicable**, which is different from `False` = wrong), and `citation_recall` over the must-cite provisions. **Passed** = category correct **and** citation recall ≥ 0.5 **and** area/transparency `is not False`.
+
+**Why more than the category:** in a real run my system classified a CV ranker as high-risk (correct) but with `annex_iii_area: "none"`, the wrong legal route, and **zero citations**. Category-only scoring would call that a pass. With area and citation checks it **fails**, which is right: in a legal tool, **right for the wrong reason is a failure.**
+
+`summarise` aggregates: pass rate, per-dimension accuracy **over applicable scenarios only**, and mean citation recall.
+
+### 2. When would you use an LLM as a judge, and how do you know you can trust it?
+
+**Answer.** For qualities code can't check (is the report clear, complete, faithful to the sources?). A judge is itself a model that can be wrong, so **measure it against human labels first**: accuracy, **TPR** (judge says pass when the human says pass) and **TNR** (judge says fail when the human says fail), a confusion matrix. A lazy judge that always says "pass" has TPR = 1.0 and **TNR = 0**: it never catches a bad output, while accuracy can still look high if most cases pass. **TNR is usually what matters for a judge.** I prefer deterministic checks where possible (citations exist, deadlines present, disclaimer appended in code) and keep the judge for what's left.
+
+### 3. How does your semantic cache work, and what's the main risk?
+
+**Answer.** It stores `(question embedding, answer, timestamp)`. On a new question it drops expired entries (**TTL 24 h**, since the law and prompts change), embeds the question, and computes cosine similarity with all entries. The embeddings are normalised, so that's a **dot product**. If the best match is **≥ 0.95**, it returns the cached answer: about 10 ms and zero LLM cost instead of ~100 s locally. It also enforces a size limit (evicts the oldest) and tracks the hit rate.
+
+**The risk is a wrong hit:** two questions that look similar but mean different things. My corpus analysis showed unrelated AI Act chunks at 0.88–0.91 similarity, so a loose threshold would serve the social-scoring answer to a biometrics question. **A miss costs money; a wrong hit costs trust.** Mitigations: a strict threshold, TTL, **only caching good answers** (not refusals, citations valid), keying on the **PII-redacted** question, and reviewing hits. Time comes from an injected `clock`, so expiry is testable without waiting.
+
+### 4. How does provider fallback work? What's special about streaming?
+
+**Answer.** `FallbackProvider` wraps a list (`LLM_PROVIDERS=anthropic,openai,ollama`) behind the **same interface** as one provider (adapter pattern), so callers don't change. `complete()` tries each in order; on an exception it counts the failure, logs it and tries the next; if all fail it raises `AllProvidersFailed` listing **each provider's name and error**, **chained** (`raise … from last_error`) so the original traceback survives. **An outage degrades quality or cost instead of taking the product down.**
+
+**Streaming:** only fall back if a provider fails **before its first token**. After text has reached the user, switching models would produce an answer that's half one model and half another, so the error is **re-raised**. Implementation: a `try` around **only** starting the generator and `next()` for the first piece; the `yield first` / `yield from` part sits **outside** the `try`, so mid-stream errors propagate.
+
+**Bug I made:** my first version had `yield from` inside the `try`, so a mid-stream `ConnectionError` was caught and silently fell back, mixing two models in one answer. **A `try` catches everything in its block, so only put in it what should be handled that way.**
+
+**Production additions:** a **circuit breaker** (skip a provider that's failing repeatedly for a cool-down period instead of paying its timeout on every call), per-provider timeouts, and the `failures` counts exported as metrics (Phase 8).
+
+### 5. Walk me through debugging a failing eval suite.
+
+**Answer.** My first full run with `llama3.1:8b` locally: **0 of 12 passing**, and some patterns no single manual run could show: citations empty in **12/12**, `annex_iii_area` `none` in 11/12, a strong bias towards `high_risk`, and timeouts.
+
+1. **Start with the 100% failure**, since it's likely one systematic cause. Hypothesis: my Phase 4 verifier drops citations in the wrong format ("Article 6" vs `art-6`).
+2. **Test before fixing:** I added `flags` to the eval output and ran one scenario. No `dropped_unsupported_citations` flag → **hypothesis rejected**; the model returned no citations at all. Fixing the verifier would have changed nothing.
+3. **The same output showed where the area was lost:** the flags contained `annex_iii:employment`, which the rules only produce when the **intake** found the area. The intake was right; the **classifier** left `annex_iii_area` at its schema default. Per-stage evidence told me *which* stage failed.
+4. **Deterministic fixes** (like copying the role in Phase 4): keep the intake's area when the classifier leaves it `none`/`unknown`; recover citations the model **named in its reasoning**, but **only if they were retrieved**, and flag `citations_from_reasoning`. That isn't gaming the eval: nothing is invented, it's grounded, and the flag makes it visible.
+5. **Measure again:** s01 went from fail to pass.
+
+**Full baseline after the fixes (20 scenarios, `llama3.1:8b`, local):**
+
+| pass rate | category acc. | area acc. | transparency acc. | citation recall |
+|---|---|---|---|---|
+| **15%** | 40% | 50% | **0%** | 0.33 |
+
+**Failure analysis, grouped by fix type:**
+
+- **Transparency 0%:** the classifier never sets `transparency_obligations`, even when the rules flag `transparency:interaction` or `transparency:synthetic_content`. A deterministic fix is possible, since Article 50 is triggered by those facts.
+- **Rule checks missing:** a `gpai:model` flag but `high_risk` (s13); `high_risk` with **no** Annex I/III flag to justify it (s04, s10). Extend the disagreement check.
+- **Prohibited practices missed (most dangerous):** s07 and s14 came out `high_risk`. My rules cover only one of Article 5's prohibited practices (emotion recognition at work or school). This is a rule-coverage gap; missing a prohibition means calling an illegal system "high-risk".
+- **Model judgement:** a synthetic-content tool classified as *prohibited* (s09); limited/minimal cases called `high_risk`; reasoning that names no articles (s05, s12). This needs a better prompt or a **stronger model**.
+- **Timeouts:** 4 of 20 (20%) even at 300 s. Infrastructure noise that hides real quality.
+
+**Takeaway:** a 15% pass rate with a local 8B model isn't the end result; it's a **map** of what to fix, separating what code can fix (rules, deterministic checks) from what needs a stronger model. Every change after this is measured against the same suite.
+
+### 6. Tell me about a fix that made things worse.
+
+**Answer.** After the baseline I added deterministic fixes: transparency follows the rules' Article 50 flags; high-risk without an Annex I/III basis is flagged low-confidence; more Article 5 rules; and a **safety floor** where a rule-detected **prohibited practice or GPAI model** overrides the LLM's category.
+
+Measured on the 9 affected scenarios: **transparency accuracy 0% → 100%**, category accuracy 0/9 → 2/9, and four confidently wrong high-risk answers became **flagged for review**. But one scenario **regressed in kind**: an image-generation app (s09) came out as **`gpai`**. The 8B intake had wrongly set `is_general_purpose_model = True`, and my override turned that wrong extracted fact into an authoritative-looking category.
+
+**What I changed:** I kept the override for **prohibited** practices only. There, the costs are asymmetric: calling an illegal system "high-risk" is the worst outcome, and a false "prohibited" is visible and reviewable. For GPAI there's no such asymmetry and the input fact had been shown to be unreliable, so it only raises `rules_disagree_with_llm`. The code comment and a unit test record why.
+
+**Lessons:** (1) a rule-based override is only as reliable as the facts it's based on, and here those facts come from an LLM; (2) **measure every fix**, because without the before/after run the GPAI override looked like a clear win (s13 fixed) while silently making s09 worse; (3) overriding a model should be justified by the **cost asymmetry of errors**, not by convenience.

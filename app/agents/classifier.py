@@ -12,6 +12,7 @@ from __future__ import annotations
 import json  # noqa: F401  (useful for building the prompt)
 
 from app.agents.schemas import RiskAssessment, SystemProfile
+from app.agents.writer import cited_provisions
 from app.llm.structured import complete_structured
 from app.llmops.prompts import get_prompt
 from app.retrieval.search import hybrid_search
@@ -111,14 +112,46 @@ def classify(profile: SystemProfile, flags: list[str], store, embedder, provider
     if len(assessment.citations) < n_citations_before:
         added.add("dropped_unsupported_citations")
 
+    # a2) small models often explain the law in "reasoning" but leave "citations" empty.
+    #     Recover ids the model actually mentioned AND that were actually retrieved, and say so.
+    if not assessment.citations:
+        recovered = [pid for pid in cited_provisions(assessment.reasoning) if pid in valid_ids]
+        if recovered:
+            assessment.citations = recovered
+            added.add("citations_from_reasoning")
+
     # c) does the LLM contradict the deterministic rules?
     annex = any(f.startswith("annex_iii:") for f in flags)
+    annex_i = "annex_i:safety_component" in flags
     prohibited = any(f.startswith("prohibited:") for f in flags)
-    if (annex and assessment.category in ("minimal_risk", "limited_risk")) or (
-        prohibited and assessment.category != "prohibited"
+    gpai = "gpai:model" in flags
+    if (
+        (annex and assessment.category in ("minimal_risk", "limited_risk"))
+        or (prohibited and assessment.category != "prohibited")
+        or (gpai and assessment.category not in ("gpai", "prohibited"))
     ):
         assessment.confidence = "low"
         added.add("rules_disagree_with_llm")
+
+    # c2) safety floor: a prohibited practice found by the rules sets the category, whatever the LLM
+    #     said. Understating a prohibition is the costliest error a compliance tool can make; the flags
+    #     above keep the override visible for human review.
+    #     Deliberately NOT done for GPAI: evals showed the intake marks ordinary generative apps as
+    #     general-purpose models (s09), and there is no cost asymmetry to justify overriding. The
+    #     disagreement flag in (c) is enough.
+    if prohibited and assessment.category != "prohibited":
+        assessment.category = "prohibited"
+        added.add("category_from_rules")
+
+    # c3) high-risk needs a legal basis: an Annex III area or an Annex I safety component.
+    #     Without either, don't override (Article 6 needs judgement), but mark it for review.
+    if assessment.category == "high_risk" and not (annex or annex_i):
+        assessment.confidence = "low"
+        added.add("high_risk_without_rule_support")
+
+    # c4) Article 50 transparency duties follow from facts the rules already detected.
+    if any(f.startswith("transparency:") for f in flags):
+        assessment.transparency_obligations = True
 
     # b) merge all flags once: LLM's + rules' + ours, sorted and de-duplicated
     assessment.flags = sorted(set(assessment.flags) | set(flags) | added)
@@ -130,5 +163,9 @@ def classify(profile: SystemProfile, flags: list[str], store, embedder, provider
     # e) fill in the role from the intake profile
     if assessment.role == "unknown":
         assessment.role = profile.role
+
+    # f) the classifier often leaves the area at its default; keep the intake's area
+    if assessment.annex_iii_area in ("none", "unknown") and profile.annex_iii_area not in ("none", "unknown"):
+        assessment.annex_iii_area = profile.annex_iii_area
 
     return assessment

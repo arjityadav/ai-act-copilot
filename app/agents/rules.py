@@ -9,6 +9,8 @@ flags go into the classifier's prompt, and afterwards we check the LLM didn't co
 
 from __future__ import annotations
 
+import re
+
 from app.agents.schemas import SystemProfile
 
 WORKPLACE_OR_EDUCATION = (
@@ -21,14 +23,34 @@ WORKPLACE_OR_EDUCATION = (
     "school",
     "university",
     "employee",
+    "worker",
+    "staff",
+    "call centre",
+    "call center",
+    "student",
+    "pupil",
+    "teacher",
+    "classroom",
 )
+# Whole words only (optional plural "s"/"es"/"ing"...), so "hr" doesn't match "through" or "three".
+WORKPLACE_RE = re.compile(r"\b(" + "|".join(re.escape(w) for w in WORKPLACE_OR_EDUCATION) + r")\w*\b")
+
+
+def _workplace_or_education(profile: SystemProfile) -> bool:
+    """Look at sector, purpose and affected persons: a call-centre tool that monitors 'agents' may have
+    sector 'customer service' while the purpose or affected persons reveal a workplace setting."""
+    text = " ".join([profile.sector, profile.purpose, profile.affected_persons]).lower()
+    return bool(WORKPLACE_RE.search(text))
 
 
 def screen(profile: SystemProfile) -> list[str]:
     """Return sorted, de-duplicated flags from these rules:
 
     "prohibited:emotion_recognition_work_education"
-        profile.emotion_recognition is True AND profile.sector (lower-cased) contains any WORKPLACE_OR_EDUCATION word
+        profile.emotion_recognition is True AND sector, purpose or affected persons mention a
+        WORKPLACE_OR_EDUCATION word (whole word)                              (Article 5(1)(f))
+    "prohibited:social_scoring"            profile.social_scoring            (Article 5(1)(c))
+    "prohibited:untargeted_face_scraping"  profile.untargeted_face_scraping  (Article 5(1)(e))
     "annex_iii:<area>"          profile.annex_iii_area is not "none" or "unknown"   (e.g. "annex_iii:employment")
     "annex_i:safety_component"  profile.safety_component_of_product
     "transparency:interaction"  profile.interacts_with_people
@@ -40,8 +62,14 @@ def screen(profile: SystemProfile) -> list[str]:
     """
     flags = set()
 
-    if profile.emotion_recognition and any(word in profile.sector.lower() for word in WORKPLACE_OR_EDUCATION):
+    if profile.emotion_recognition and _workplace_or_education(profile):
         flags.add("prohibited:emotion_recognition_work_education")
+
+    if profile.social_scoring:
+        flags.add("prohibited:social_scoring")
+
+    if profile.untargeted_face_scraping:
+        flags.add("prohibited:untargeted_face_scraping")
 
     if profile.annex_iii_area not in ("none", "unknown"):
         flags.add(f"annex_iii:{profile.annex_iii_area}")

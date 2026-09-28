@@ -13,11 +13,25 @@ def P(**kw):
 
 def test_screen_flags():
     assert rules.screen(P()) == ["annex_iii:employment", "decisions_about_people"]
-    flags = rules.screen(P(emotion_recognition=True, uses_biometrics=True, sector="Workplace call centre",
-                           interacts_with_people=True, generates_content=True, annex_iii_area="none",
-                           decisions_about_people=False, role="unknown"))
-    assert flags == ["biometrics", "prohibited:emotion_recognition_work_education", "role_unknown",
-                     "transparency:interaction", "transparency:synthetic_content"], flags
+    flags = rules.screen(
+        P(
+            emotion_recognition=True,
+            uses_biometrics=True,
+            sector="Workplace call centre",
+            interacts_with_people=True,
+            generates_content=True,
+            annex_iii_area="none",
+            decisions_about_people=False,
+            role="unknown",
+        )
+    )
+    assert flags == [
+        "biometrics",
+        "prohibited:emotion_recognition_work_education",
+        "role_unknown",
+        "transparency:interaction",
+        "transparency:synthetic_content",
+    ], flags
     assert "gpai:model" in rules.screen(P(is_general_purpose_model=True))
     assert "annex_i:safety_component" in rules.screen(P(safety_component_of_product=True))
     assert not any(f.startswith("annex_iii") for f in rules.screen(P(annex_iii_area="unknown")))
@@ -53,8 +67,13 @@ def test_plan_queries():
 
 def test_gather_context_dedupes():
     store, emb = small_corpus()
-    chunks = classifier.gather_context(["social scoring prohibited", "social scoring prohibited", "Annex III recruitment"],
-                                       store, emb, per_query=3, max_chunks=4)
+    chunks = classifier.gather_context(
+        ["social scoring prohibited", "social scoring prohibited", "Annex III recruitment"],
+        store,
+        emb,
+        per_query=3,
+        max_chunks=4,
+    )
     ids = [c.id for c in chunks]
     assert len(ids) == len(set(ids)) and len(ids) <= 4
 
@@ -80,8 +99,13 @@ def test_classify_detects_rule_disagreement():
 def test_classify_lowers_confidence_when_info_missing_and_copies_role():
     store, emb = small_corpus()
     fake = FakeProvider([assessment_json(confidence="high", role="unknown")])
-    a = classifier.classify(P(missing_info=["Is it used for hiring decisions?"], role="deployer"),
-                            ["annex_iii:employment"], store, emb, fake)
+    a = classifier.classify(
+        P(missing_info=["Is it used for hiring decisions?"], role="deployer"),
+        ["annex_iii:employment"],
+        store,
+        emb,
+        fake,
+    )
     assert a.confidence == "medium" and a.role == "deployer"
 
 
@@ -91,4 +115,58 @@ def test_classify_prompt_contains_profile_json():
     classifier.classify(P(), [], store, emb, fake)
     content = fake.calls[0]["messages"][0]["content"]
     start = content.index("<profile>") + len("<profile>")
-    assert json.loads(content[start:content.index("</profile>")])["name"] == "CV Ranker"
+    assert json.loads(content[start : content.index("</profile>")])["name"] == "CV Ranker"
+
+
+def test_screen_more_prohibited_practices_and_workplace_context():
+    # the workplace can show up in the purpose or affected persons, not only in the sector
+    call_centre = P(
+        emotion_recognition=True,
+        sector="customer service",
+        purpose="Detects stress in call centre agents' voices",
+        affected_persons="call centre staff",
+    )
+    assert "prohibited:emotion_recognition_work_education" in rules.screen(call_centre)
+    # whole words only: "through" must not count as "hr"
+    shop = P(
+        emotion_recognition=True,
+        sector="retail",
+        purpose="Reads shoppers' moods through cameras",
+        affected_persons="customers",
+        annex_iii_area="none",
+    )
+    assert not any(f.startswith("prohibited") for f in rules.screen(shop))
+    assert "prohibited:social_scoring" in rules.screen(P(social_scoring=True))
+    assert "prohibited:untargeted_face_scraping" in rules.screen(P(untargeted_face_scraping=True))
+
+
+def test_classify_safety_floor_for_prohibited_only_flag_for_gpai():
+    store, emb = small_corpus()
+    a = classifier.classify(
+        P(), ["prohibited:social_scoring"], store, emb, FakeProvider([assessment_json(category="high_risk")])
+    )
+    assert a.category == "prohibited" and a.confidence == "low"
+    assert {"category_from_rules", "rules_disagree_with_llm"} <= set(a.flags)
+    g = classifier.classify(
+        P(annex_iii_area="none", is_general_purpose_model=True),
+        ["gpai:model"],
+        store,
+        emb,
+        FakeProvider([assessment_json(category="high_risk", annex_iii_area="none")]),
+    )
+    # GPAI is flagged, not overridden: the intake mislabels generative apps as GPAI models (eval s09)
+    assert g.category == "high_risk" and g.confidence == "low"
+    assert "rules_disagree_with_llm" in g.flags and "category_from_rules" not in g.flags
+
+
+def test_classify_transparency_and_unsupported_high_risk():
+    store, emb = small_corpus()
+    a = classifier.classify(
+        P(annex_iii_area="none"),
+        ["transparency:interaction"],
+        store,
+        emb,
+        FakeProvider([assessment_json(category="high_risk", annex_iii_area="none")]),
+    )
+    assert a.transparency_obligations is True
+    assert a.confidence == "low" and "high_risk_without_rule_support" in a.flags

@@ -1,7 +1,7 @@
 """Streamlit UI (given). Talks to the API only, like any other client.
 
-    make ui            (docker, http://localhost:8501)
-    or: API_URL=http://localhost:8000 streamlit run ui/streamlit_app.py
+make ui            (docker, http://localhost:8501)
+or: API_URL=http://localhost:8000 streamlit run ui/streamlit_app.py
 """
 
 import json
@@ -37,13 +37,24 @@ with tab_ask:
                     st.write(f"[{s['n']}] {s['citation']} · {s['title']}")
             c1, c2 = st.columns(2)
             if c1.button("👍 Helpful"):
-                httpx.post(f"{API}/feedback", json={"target": f"chat:{data['trace_id']}", "rating": 1}, headers=HEADERS)
+                httpx.post(
+                    f"{API}/feedback",
+                    json={"target": f"chat:{data['trace_id']}", "rating": 1},
+                    headers=HEADERS,
+                )
             if c2.button("👎 Not helpful"):
-                httpx.post(f"{API}/feedback", json={"target": f"chat:{data['trace_id']}", "rating": -1}, headers=HEADERS)
+                httpx.post(
+                    f"{API}/feedback",
+                    json={"target": f"chat:{data['trace_id']}", "rating": -1},
+                    headers=HEADERS,
+                )
 
 with tab_assess:
-    desc = st.text_area("Describe the AI system", height=160,
-                        placeholder="What it does, who builds it, who uses it, and which decisions about people it affects.")
+    desc = st.text_area(
+        "Describe the AI system",
+        height=160,
+        placeholder="What it does, who builds it, who uses it, and which decisions about people it affects.",
+    )
     if st.button("Run assessment", type="primary") and desc:
         r = httpx.post(f"{API}/assessments", json={"description": desc}, headers=HEADERS, timeout=30)
         if r.status_code != 202:

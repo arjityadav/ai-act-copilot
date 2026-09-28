@@ -28,8 +28,12 @@ class CopilotUser(HttpUser):
 
     @task(1)
     def assessment(self):
-        r = self.client.post("/assessments", headers=HEADERS, name="/assessments",
-                             json={"description": "A chatbot that answers customer questions about our online shop."})
+        r = self.client.post(
+            "/assessments",
+            headers=HEADERS,
+            name="/assessments",
+            json={"description": "A chatbot that answers customer questions about our online shop."},
+        )
         if r.status_code == 202:
             self.client.get(f"/assessments/{r.json()['id']}", headers=HEADERS, name="/assessments/{id}")
 

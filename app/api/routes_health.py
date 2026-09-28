@@ -24,6 +24,7 @@ def ready(settings=Depends(settings_dep)):
     if settings.job_mode == "queue":
         try:
             import redis
+
             redis.Redis.from_url(settings.redis_url, socket_timeout=2).ping()
             checks["redis"] = "ok"
         except Exception as e:

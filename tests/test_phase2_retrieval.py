@@ -61,6 +61,8 @@ def test_hybrid_search_applies_reranker():
 
     rr = ReverseReranker()
     fused = [c.id for c in hybrid_search("credit score insurance", store, emb, k=30, candidates=30)]
-    reranked = [c.id for c in hybrid_search("credit score insurance", store, emb, k=2, candidates=30, reranker=rr)]
+    reranked = [
+        c.id for c in hybrid_search("credit score insurance", store, emb, k=2, candidates=30, reranker=rr)
+    ]
     assert rr.seen == fused, "the reranker gets the fused candidates, in fused order"
     assert reranked == list(reversed(fused))[:2], "return the reranker's top k"

@@ -22,6 +22,7 @@ class OllamaEmbedder:
 
     def __init__(self, settings: Settings | None = None):
         import ollama
+
         s = settings or get_settings()
         self.model, self.dim = s.embed_model, s.embed_dim
         self._client = ollama.Client(host=s.ollama_host, timeout=s.llm_timeout_s)
@@ -30,7 +31,7 @@ class OllamaEmbedder:
         prefix = "search_query: " if kind == "query" else "search_document: "
         out = []
         for i in range(0, len(texts), 32):
-            r = self._client.embed(model=self.model, input=[prefix + t for t in texts[i:i + 32]])
+            r = self._client.embed(model=self.model, input=[prefix + t for t in texts[i : i + 32]])
             out.extend(r["embeddings"])
         v = np.asarray(out, dtype=np.float32)
         return v / np.maximum(np.linalg.norm(v, axis=1, keepdims=True), 1e-12)

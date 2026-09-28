@@ -4,7 +4,13 @@ from fastapi.testclient import TestClient
 
 from app.api import deps
 from app.main import create_app
-from app.rag.answer import REFUSAL, answer_question, build_user_message, citations_are_valid, extract_citations
+from app.rag.answer import (
+    REFUSAL,
+    answer_question,
+    build_user_message,
+    citations_are_valid,
+    extract_citations,
+)
 from app.rag.guardrails import check_input, redact_pii
 from tests.helpers import FakeProvider, make_chunk, small_corpus
 
@@ -12,8 +18,8 @@ from tests.helpers import FakeProvider, make_chunk, small_corpus
 def test_build_user_message_format():
     chunks = [make_chunk("art-5", "Text five"), make_chunk("annex-iii", "Text annex")]
     msg = build_user_message("Is X banned?", chunks)
-    assert msg.startswith("<documents>\n<document n=\"1\" citation=\"Article 5\">\nText five\n</document>\n")
-    assert "<document n=\"2\" citation=\"Annex III\">\nText annex\n</document>\n</documents>" in msg
+    assert msg.startswith('<documents>\n<document n="1" citation="Article 5">\nText five\n</document>\n')
+    assert '<document n="2" citation="Annex III">\nText annex\n</document>\n</documents>' in msg
     assert msg.endswith("<question>Is X banned?</question>")
     assert build_user_message("Q?", []).startswith("<documents>\n</documents>")
 
@@ -43,7 +49,9 @@ def test_redact_pii():
     assert "anna.schmidt" not in out and "[EMAIL]" in out
     assert "[PHONE]" in out and "1234567" not in out
     assert "[IBAN]" in out and "3704" not in out
-    assert redact_pii("Article 5 of Regulation 2024/1689") == "Article 5 of Regulation 2024/1689", "don't redact legal references"
+    assert (
+        redact_pii("Article 5 of Regulation 2024/1689") == "Article 5 of Regulation 2024/1689"
+    ), "don't redact legal references"
 
 
 def test_answer_question_with_fake_model():

@@ -17,12 +17,14 @@ def settings_dep() -> Settings:
 @lru_cache
 def store_dep():
     from app.retrieval.store import get_store
+
     return get_store(settings_dep())
 
 
 @lru_cache
 def embedder_dep():
     from app.retrieval.embed import OllamaEmbedder
+
     return OllamaEmbedder(settings_dep())
 
 
@@ -31,12 +33,14 @@ def provider_dep():
     """The configured provider, wrapped so every call is traced (tokens, latency, cost)."""
     from app.llm.provider import get_provider
     from app.llmops.tracing import TracedProvider, default_sink
+
     return TracedProvider(get_provider(settings_dep()), agent="copilot", sink=default_sink(settings_dep()))
 
 
 @lru_cache
 def assessments_dep():
     from app.jobs.repo import get_repo
+
     return get_repo(settings_dep())
 
 
@@ -45,6 +49,7 @@ def cache_dep():
     """Semantic cache for /chat (Phase 7). None until you've built it."""
     try:
         from app.llmops.cache import SemanticCache
+
         return SemanticCache(embedder_dep())
     except Exception:
         return None

@@ -35,8 +35,11 @@ def main():
     reranker = None
     if args.rerank:
         from app.retrieval.search import CrossEncoderReranker
+
         reranker = CrossEncoderReranker()
-    cases = [json.loads(line) for line in open("evals/retrieval_eval.jsonl", encoding="utf-8") if line.strip()]
+    cases = [
+        json.loads(line) for line in open("evals/retrieval_eval.jsonl", encoding="utf-8") if line.strip()
+    ]
     methods = {
         "vector": lambda q: [c for c, _ in store.vector_search(emb.embed([q], kind="query")[0], 20)],
         "keyword": lambda q: [c for c, _ in store.keyword_search(q, 20)],

@@ -45,13 +45,17 @@ def main():
     for label, meaning in LABELS.items():
         got: list[str] = []
         while len(got) < args.per_label:
-            prompt = (f"Write 10 varied, realistic one-sentence descriptions of AI systems, as a product manager would "
-                      f"describe them, that fall under: {meaning}. Vary industries, wording and length; avoid legal terms. "
-                      f"Don't repeat these: {got[-10:]}")
-            batch = complete_structured(provider, [{"role": "user", "content": prompt}], Batch, temperature=0.9)
+            prompt = (
+                f"Write 10 varied, realistic one-sentence descriptions of AI systems, as a product manager would "
+                f"describe them, that fall under: {meaning}. Vary industries, wording and length; avoid legal terms. "
+                f"Don't repeat these: {got[-10:]}"
+            )
+            batch = complete_structured(
+                provider, [{"role": "user", "content": prompt}], Batch, temperature=0.9
+            )
             got += [d.strip() for d in batch.descriptions if d.strip() and d.strip() not in got]
             print(f"{label}: {len(got)}/{args.per_label}")
-        rows += [{"text": d, "label": label} for d in got[:args.per_label]]
+        rows += [{"text": d, "label": label} for d in got[: args.per_label]]
     with open("data/training/annex3.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["text", "label"])
         w.writeheader()

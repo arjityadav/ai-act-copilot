@@ -23,8 +23,12 @@ router = APIRouter(prefix="/assessments", tags=["assessments"], dependencies=[De
 
 
 class AssessmentRequest(BaseModel):
-    description: str = Field(description="Describe the AI system: what it does, who uses it, whose decisions it affects")
-    practices: dict[str, str] = Field(default_factory=dict, description='Obligation id -> "yes" | "partial" | "no"')
+    description: str = Field(
+        description="Describe the AI system: what it does, who uses it, whose decisions it affects"
+    )
+    practices: dict[str, str] = Field(
+        default_factory=dict, description='Obligation id -> "yes" | "partial" | "no"'
+    )
 
 
 class AnswersRequest(BaseModel):
@@ -41,11 +45,18 @@ def _start(payload, background, settings, repo):
 
 
 @router.post("", status_code=202)
-def create(req: AssessmentRequest, background: BackgroundTasks, settings=Depends(settings_dep), repo=Depends(assessments_dep)):
+def create(
+    req: AssessmentRequest,
+    background: BackgroundTasks,
+    settings=Depends(settings_dep),
+    repo=Depends(assessments_dep),
+):
     guard = check_input(req.description, settings.max_input_chars)
     if not guard.ok:
         raise HTTPException(400, detail=guard.reason)
-    aid = _start({"description": redact_pii(req.description), "practices": req.practices}, background, settings, repo)
+    aid = _start(
+        {"description": redact_pii(req.description), "practices": req.practices}, background, settings, repo
+    )
     return {"id": aid, "status": "queued"}
 
 
@@ -58,8 +69,13 @@ def get(aid: str, repo=Depends(assessments_dep)):
 
 
 @router.post("/{aid}/answers", status_code=202)
-def answer(aid: str, req: AnswersRequest, background: BackgroundTasks, settings=Depends(settings_dep),
-           repo=Depends(assessments_dep)):
+def answer(
+    aid: str,
+    req: AnswersRequest,
+    background: BackgroundTasks,
+    settings=Depends(settings_dep),
+    repo=Depends(assessments_dep),
+):
     item = repo.get(aid)
     if item is None:
         raise HTTPException(404, detail="Assessment not found")

@@ -14,13 +14,16 @@ ACT_URL = "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_2024016
 
 
 def fetch_html(url: str = ACT_URL) -> str:
-    r = httpx.get(url, timeout=60, follow_redirects=True, headers={"User-Agent": "ai-act-copilot/0.1 (study project)"})
+    r = httpx.get(
+        url, timeout=60, follow_redirects=True, headers={"User-Agent": "ai-act-copilot/0.1 (study project)"}
+    )
     r.raise_for_status()
     return r.text
 
 
 def html_to_text(html: str) -> str:
     from bs4 import BeautifulSoup
+
     soup = BeautifulSoup(html, "html.parser")
     for tag in soup(["script", "style", "nav", "header", "footer"]):
         tag.decompose()

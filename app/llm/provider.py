@@ -46,11 +46,24 @@ class LLMProvider(Protocol):
     name: str
     model: str
 
-    def complete(self, messages: list[Message], *, system: str | None = None, json_schema: dict | None = None,
-                 temperature: float = 0.0, max_tokens: int = 1500) -> LLMResult: ...
+    def complete(
+        self,
+        messages: list[Message],
+        *,
+        system: str | None = None,
+        json_schema: dict | None = None,
+        temperature: float = 0.0,
+        max_tokens: int = 1500,
+    ) -> LLMResult: ...
 
-    def stream(self, messages: list[Message], *, system: str | None = None, temperature: float = 0.2,
-               max_tokens: int = 1500) -> Iterator[str]: ...
+    def stream(
+        self,
+        messages: list[Message],
+        *,
+        system: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int = 1500,
+    ) -> Iterator[str]: ...
 
 
 class OllamaProvider:
@@ -58,6 +71,7 @@ class OllamaProvider:
 
     def __init__(self, settings: Settings):
         import ollama
+
         self.model = settings.ollama_model
         self._client = ollama.Client(host=settings.ollama_host, timeout=settings.llm_timeout_s)
 
@@ -66,14 +80,28 @@ class OllamaProvider:
 
     def complete(self, messages, *, system=None, json_schema=None, temperature=0.0, max_tokens=1500):
         t = time.perf_counter()
-        r = self._client.chat(model=self.model, messages=self._msgs(messages, system), format=json_schema,
-                              options={"temperature": temperature, "num_predict": max_tokens})
-        return LLMResult(r["message"]["content"], r.get("prompt_eval_count") or 0, r.get("eval_count") or 0,
-                         time.perf_counter() - t, self.name, self.model)
+        r = self._client.chat(
+            model=self.model,
+            messages=self._msgs(messages, system),
+            format=json_schema,
+            options={"temperature": temperature, "num_predict": max_tokens},
+        )
+        return LLMResult(
+            r["message"]["content"],
+            r.get("prompt_eval_count") or 0,
+            r.get("eval_count") or 0,
+            time.perf_counter() - t,
+            self.name,
+            self.model,
+        )
 
     def stream(self, messages, *, system=None, temperature=0.2, max_tokens=1500):
-        for chunk in self._client.chat(model=self.model, messages=self._msgs(messages, system), stream=True,
-                                       options={"temperature": temperature, "num_predict": max_tokens}):
+        for chunk in self._client.chat(
+            model=self.model,
+            messages=self._msgs(messages, system),
+            stream=True,
+            options={"temperature": temperature, "num_predict": max_tokens},
+        ):
             if chunk["message"]["content"]:
                 yield chunk["message"]["content"]
 
@@ -82,22 +110,35 @@ class AnthropicProvider:
     name = "anthropic"
 
     def __init__(self, settings: Settings):
-        import anthropic                                  # pip install ".[cloud]"; reads ANTHROPIC_API_KEY
+        import anthropic  # pip install ".[cloud]"; reads ANTHROPIC_API_KEY
+
         self.model = settings.anthropic_model
         self._client = anthropic.Anthropic(timeout=settings.llm_timeout_s, max_retries=2)
 
     def complete(self, messages, *, system=None, json_schema=None, temperature=0.0, max_tokens=1500):
         t = time.perf_counter()
         kwargs = {"system": system} if system else {}
-        r = self._client.messages.create(model=self.model, max_tokens=max_tokens, temperature=temperature,
-                                         messages=list(messages), **kwargs)
+        r = self._client.messages.create(
+            model=self.model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            messages=list(messages),
+            **kwargs,
+        )
         text = "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
-        return LLMResult(text, r.usage.input_tokens, r.usage.output_tokens, time.perf_counter() - t, self.name, self.model)
+        return LLMResult(
+            text, r.usage.input_tokens, r.usage.output_tokens, time.perf_counter() - t, self.name, self.model
+        )
 
     def stream(self, messages, *, system=None, temperature=0.2, max_tokens=1500):
         kwargs = {"system": system} if system else {}
-        with self._client.messages.stream(model=self.model, max_tokens=max_tokens, temperature=temperature,
-                                          messages=list(messages), **kwargs) as s:
+        with self._client.messages.stream(
+            model=self.model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            messages=list(messages),
+            **kwargs,
+        ) as s:
             yield from s.text_stream
 
 
@@ -105,7 +146,8 @@ class OpenAIProvider:
     name = "openai"
 
     def __init__(self, settings: Settings):
-        import openai                                     # pip install ".[cloud]"; reads OPENAI_API_KEY
+        import openai  # pip install ".[cloud]"; reads OPENAI_API_KEY
+
         self.model = settings.openai_model
         self._client = openai.OpenAI(timeout=settings.llm_timeout_s, max_retries=2)
 
@@ -115,21 +157,38 @@ class OpenAIProvider:
     def complete(self, messages, *, system=None, json_schema=None, temperature=0.0, max_tokens=1500):
         t = time.perf_counter()
         extra = {"response_format": {"type": "json_object"}} if json_schema else {}
-        r = self._client.chat.completions.create(model=self.model, messages=self._msgs(messages, system),
-                                                 temperature=temperature, max_tokens=max_tokens, **extra)
+        r = self._client.chat.completions.create(
+            model=self.model,
+            messages=self._msgs(messages, system),
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **extra,
+        )
         u = r.usage
-        return LLMResult(r.choices[0].message.content or "", u.prompt_tokens if u else 0,
-                         u.completion_tokens if u else 0, time.perf_counter() - t, self.name, self.model)
+        return LLMResult(
+            r.choices[0].message.content or "",
+            u.prompt_tokens if u else 0,
+            u.completion_tokens if u else 0,
+            time.perf_counter() - t,
+            self.name,
+            self.model,
+        )
 
     def stream(self, messages, *, system=None, temperature=0.2, max_tokens=1500):
-        for ev in self._client.chat.completions.create(model=self.model, messages=self._msgs(messages, system),
-                                                       temperature=temperature, max_tokens=max_tokens, stream=True):
+        for ev in self._client.chat.completions.create(
+            model=self.model,
+            messages=self._msgs(messages, system),
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=True,
+        ):
             if ev.choices and ev.choices[0].delta.content:
                 yield ev.choices[0].delta.content
 
 
 class FakeProvider:
     """For tests: replies come from a list (used in order) or a function of the messages."""
+
     name = "fake"
     model = "fake-1"
 
@@ -147,7 +206,9 @@ class FakeProvider:
     def complete(self, messages, *, system=None, json_schema=None, temperature=0.0, max_tokens=1500):
         self.calls.append({"messages": list(messages), "system": system, "json_schema": json_schema})
         text = self._next(messages, system)
-        return LLMResult(text, sum(len(m["content"]) // 4 for m in messages), len(text) // 4, 0.001, self.name, self.model)
+        return LLMResult(
+            text, sum(len(m["content"]) // 4 for m in messages), len(text) // 4, 0.001, self.name, self.model
+        )
 
     def stream(self, messages, *, system=None, temperature=0.2, max_tokens=1500):
         self.calls.append({"messages": list(messages), "system": system, "stream": True})
@@ -169,4 +230,5 @@ def get_provider(settings: Settings | None = None) -> LLMProvider:
     if len(names) == 1:
         return make_provider(names[0], settings)
     from app.llmops.fallback import FallbackProvider
+
     return FallbackProvider([make_provider(n, settings) for n in names])

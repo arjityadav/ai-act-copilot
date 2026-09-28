@@ -25,10 +25,15 @@ def test_http_metrics_use_route_templates():
 
 
 def test_record_llm_call():
-    r = LLMResult(text="x", input_tokens=100, output_tokens=40, latency_s=1.5, provider="anthropic", model="m")
+    r = LLMResult(
+        text="x", input_tokens=100, output_tokens=40, latency_s=1.5, provider="anthropic", model="m"
+    )
     before_in = sample("llm_tokens_total", {"provider": "anthropic", "model": "m", "kind": "input"})
     metrics.record_llm_call(r)
-    assert sample("llm_tokens_total", {"provider": "anthropic", "model": "m", "kind": "input"}) == before_in + 100
+    assert (
+        sample("llm_tokens_total", {"provider": "anthropic", "model": "m", "kind": "input"})
+        == before_in + 100
+    )
     assert sample("llm_tokens_total", {"provider": "anthropic", "model": "m", "kind": "output"}) >= 40
     assert sample("llm_cost_usd_total", {"provider": "anthropic", "model": "m"}) > 0
     assert sample("llm_call_duration_seconds_count", {"provider": "anthropic"}) >= 1

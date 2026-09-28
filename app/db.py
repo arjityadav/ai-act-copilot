@@ -1,6 +1,6 @@
 """Tiny SQL migration runner (given): applies migrations/NNN_*.sql once each, in order.
 
-    python -m app.db          (or: make migrate)
+python -m app.db          (or: make migrate)
 """
 
 import glob
@@ -13,9 +13,12 @@ MIGRATIONS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 
 def migrate(database_url=None):
     import psycopg
+
     url = database_url or get_settings().database_url
     with psycopg.connect(url, autocommit=True) as conn:
-        conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at timestamptz DEFAULT now())")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at timestamptz DEFAULT now())"
+        )
         done = {r[0] for r in conn.execute("SELECT version FROM schema_migrations").fetchall()}
         for path in sorted(glob.glob(os.path.join(MIGRATIONS, "*.sql"))):
             version = os.path.basename(path).split("_")[0]

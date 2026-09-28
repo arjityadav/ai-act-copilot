@@ -30,7 +30,9 @@ def main():
     open(CORPUS, "w", encoding="utf-8").write(text)
     s = get_settings()
     stats = ingest_text(text, get_store(s), OllamaEmbedder(s))
-    print(f"{stats.provisions} provisions · {stats.chunks} chunks · {stats.changed} new/changed · {stats.seconds:.0f}s")
+    print(
+        f"{stats.provisions} provisions · {stats.chunks} chunks · {stats.changed} new/changed · {stats.seconds:.0f}s"
+    )
 
 
 if __name__ == "__main__":

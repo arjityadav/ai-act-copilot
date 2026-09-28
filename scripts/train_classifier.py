@@ -29,6 +29,7 @@ def main():
     print("Saved local fallback model to data/models/annex3.joblib")
     if info["version"]:
         from app.mlops.registry import promote
+
         ok, reason = promote(info["version"], m)
         print(f"Version {info['version']}: {'PROMOTED to champion' if ok else 'not promoted'} ({reason})")
 

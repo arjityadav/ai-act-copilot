@@ -30,10 +30,14 @@ def test_should_promote_rules():
     assert registry.should_promote(M(0.6), None) == (False, "below minimum macro F1")
     assert registry.should_promote(M(0.8), None) == (True, "first model")
     assert registry.should_promote(M(0.805), M(0.80)) == (False, "not better than champion")
-    ok, reason = registry.should_promote(M(0.85, {"employment": 0.6, "education": 0.9}),
-                                         M(0.80, {"employment": 0.8, "education": 0.8}))
+    ok, reason = registry.should_promote(
+        M(0.85, {"employment": 0.6, "education": 0.9}), M(0.80, {"employment": 0.8, "education": 0.8})
+    )
     assert not ok and reason == "regression on class employment"
-    assert registry.should_promote(M(0.85, {"x": 0.8}), M(0.80, {"x": 0.85})) == (True, "better than champion")
+    assert registry.should_promote(M(0.85, {"x": 0.8}), M(0.80, {"x": 0.85})) == (
+        True,
+        "better than champion",
+    )
 
 
 def test_psi():

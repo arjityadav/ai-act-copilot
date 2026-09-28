@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import os
 
-LOCAL_MODEL = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                           "data", "models", "annex3.joblib")
+LOCAL_MODEL = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data",
+    "models",
+    "annex3.joblib",
+)
 
 
 class AreaClassifier:
@@ -22,10 +26,14 @@ def load_classifier(settings):
     try:
         import mlflow
         import mlflow.sklearn
+
         mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-        return AreaClassifier(mlflow.sklearn.load_model(settings.classifier_model_uri), settings.classifier_model_uri)
+        return AreaClassifier(
+            mlflow.sklearn.load_model(settings.classifier_model_uri), settings.classifier_model_uri
+        )
     except Exception:
         import joblib
+
         if os.path.exists(LOCAL_MODEL):
             return AreaClassifier(joblib.load(LOCAL_MODEL), "local-file")
         return None

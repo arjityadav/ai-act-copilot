@@ -23,12 +23,12 @@ import numpy as np
 
 @dataclass
 class Chunk:
-    id: str                          # e.g. "art-5-p1-0"
-    provision_id: str                # e.g. "art-5" or "annex-iii"
-    kind: str                        # "article" | "annex"
-    number: str                      # "5" or "III"
-    title: str                       # "Prohibited AI practices"
-    text: str                        # chunk text incl. a context header
+    id: str  # e.g. "art-5-p1-0"
+    provision_id: str  # e.g. "art-5" or "annex-iii"
+    kind: str  # "article" | "annex"
+    number: str  # "5" or "III"
+    title: str  # "Prohibited AI practices"
+    text: str  # chunk text incl. a context header
     chapter: str = ""
     metadata: dict = field(default_factory=dict)
 
@@ -52,7 +52,7 @@ class InMemoryStore:
 
     def upsert(self, chunks, embeddings):
         changed = 0
-        for c, v in zip(chunks, embeddings):
+        for c, v in zip(chunks, embeddings, strict=True):
             old = self.chunks.get(c.id)
             if old is None or old.content_hash != c.content_hash:
                 changed += 1
@@ -93,8 +93,14 @@ class InMemoryStore:
         scores = {}
         for cid, toks in docs.items():
             tf = Counter(toks)
-            s = sum(math.log(1 + (n - df[w] + 0.5) / (df[w] + 0.5)) * tf[w] * (k1 + 1)
-                    / (tf[w] + k1 * (1 - b + b * len(toks) / avgdl)) for w in q if tf[w])
+            s = sum(
+                math.log(1 + (n - df[w] + 0.5) / (df[w] + 0.5))
+                * tf[w]
+                * (k1 + 1)
+                / (tf[w] + k1 * (1 - b + b * len(toks) / avgdl))
+                for w in q
+                if tf[w]
+            )
             if s > 0:
                 scores[cid] = s
         top = sorted(scores, key=scores.get, reverse=True)[:k]
@@ -106,6 +112,7 @@ class PostgresStore:
 
     def __init__(self, database_url: str):
         import psycopg
+
         self._psycopg = psycopg
         self.url = database_url
 
@@ -118,7 +125,9 @@ class PostgresStore:
 
     @staticmethod
     def _row_to_chunk(r):
-        return Chunk(id=r[0], provision_id=r[1], kind=r[2], number=r[3], title=r[4], text=r[5], chapter=r[6] or "")
+        return Chunk(
+            id=r[0], provision_id=r[1], kind=r[2], number=r[3], title=r[4], text=r[5], chapter=r[6] or ""
+        )
 
     _COLS = "id, provision_id, kind, number, title, text, chapter"
 
@@ -132,9 +141,21 @@ class PostgresStore:
                   WHERE chunks.content_hash <> EXCLUDED.content_hash"""
         changed = 0
         with self._conn() as conn, conn.cursor() as cur:
-            for c, v in zip(chunks, embeddings):
-                cur.execute(sql, (c.id, c.provision_id, c.kind, c.number, c.title, c.text, c.chapter,
-                                  c.content_hash, self._vec(v)))
+            for c, v in zip(chunks, embeddings, strict=True):
+                cur.execute(
+                    sql,
+                    (
+                        c.id,
+                        c.provision_id,
+                        c.kind,
+                        c.number,
+                        c.title,
+                        c.text,
+                        c.chapter,
+                        c.content_hash,
+                        self._vec(v),
+                    ),
+                )
                 changed += cur.rowcount
         return changed
 
@@ -158,19 +179,26 @@ class PostgresStore:
     def vector_search(self, query_vec, k=10):
         v = self._vec(query_vec)
         with self._conn() as conn:
-            rows = conn.execute(f"""SELECT {self._COLS}, 1 - (embedding <=> %s::vector) AS score
-                                    FROM chunks ORDER BY embedding <=> %s::vector LIMIT %s""", (v, v, k)).fetchall()
+            rows = conn.execute(
+                f"""SELECT {self._COLS}, 1 - (embedding <=> %s::vector) AS score
+                                    FROM chunks ORDER BY embedding <=> %s::vector LIMIT %s""",
+                (v, v, k),
+            ).fetchall()
         return [(self._row_to_chunk(r), float(r[7])) for r in rows]
 
     def keyword_search(self, query, k=10):
         with self._conn() as conn:
-            rows = conn.execute(f"""SELECT {self._COLS}, ts_rank_cd(tsv, q) AS score
+            rows = conn.execute(
+                f"""SELECT {self._COLS}, ts_rank_cd(tsv, q) AS score
                                     FROM chunks, websearch_to_tsquery('english', %s) AS q
-                                    WHERE tsv @@ q ORDER BY score DESC LIMIT %s""", (query, k)).fetchall()
+                                    WHERE tsv @@ q ORDER BY score DESC LIMIT %s""",
+                (query, k),
+            ).fetchall()
         return [(self._row_to_chunk(r), float(r[7])) for r in rows]
 
 
 def get_store(settings=None):
     from app.config import get_settings
+
     s = settings or get_settings()
     return InMemoryStore() if s.store == "memory" else PostgresStore(s.database_url)

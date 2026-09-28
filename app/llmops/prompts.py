@@ -9,7 +9,9 @@ from functools import lru_cache
 
 import yaml
 
-PROMPT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "prompts")
+PROMPT_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "prompts"
+)
 
 
 @dataclass(frozen=True)
@@ -27,4 +29,6 @@ class Prompt:
 def get_prompt(name: str) -> Prompt:
     with open(os.path.join(PROMPT_DIR, f"{name}.yaml"), encoding="utf-8") as f:
         d = yaml.safe_load(f)
-    return Prompt(name=d["name"], version=str(d["version"]), system=d["system"].strip(), template=d.get("template", ""))
+    return Prompt(
+        name=d["name"], version=str(d["version"]), system=d["system"].strip(), template=d.get("template", "")
+    )

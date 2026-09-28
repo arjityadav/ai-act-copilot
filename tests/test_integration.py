@@ -19,11 +19,14 @@ DB = os.environ.get("DATABASE_URL", "postgresql://copilot:copilot@localhost:5432
 def test_postgres_store_roundtrip():
     from app.db import migrate
     from app.retrieval.store import PostgresStore
+
     migrate(DB)
     store = PostgresStore(DB)
     tag = uuid.uuid4().hex[:6]
-    chunks = [make_chunk(f"art-t{tag}", "social scoring is prohibited", idx=0),
-              make_chunk(f"art-u{tag}", "chatbots must disclose they are AI", idx=0)]
+    chunks = [
+        make_chunk(f"art-t{tag}", "social scoring is prohibited", idx=0),
+        make_chunk(f"art-u{tag}", "chatbots must disclose they are AI", idx=0),
+    ]
     # embeddings must match the vector(768) column
     emb = HashEmbedder(768)
     assert store.upsert(chunks, emb.embed([c.text for c in chunks])) == 2
@@ -37,6 +40,7 @@ def test_postgres_store_roundtrip():
 
 def test_postgres_assessment_repo():
     from app.jobs.repo import PostgresRepo
+
     repo = PostgresRepo(DB)
     aid = repo.create({"description": "test"})
     repo.add_event(aid, "intake", "hello")
@@ -48,6 +52,7 @@ def test_postgres_assessment_repo():
 
 def test_redis_ping():
     import redis
+
     assert redis.Redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0")).ping()
 
 
@@ -55,6 +60,7 @@ def test_ollama_generation_and_embeddings():
     from app.config import get_settings
     from app.llm.provider import OllamaProvider
     from app.retrieval.embed import OllamaEmbedder
+
     s = get_settings()
     r = OllamaProvider(s).complete([{"role": "user", "content": "Reply with the word OK."}])
     assert r.text and r.output_tokens > 0

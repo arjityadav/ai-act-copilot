@@ -62,24 +62,55 @@ def test_semantic_cache():
 
 def test_score_assessment():
     exp = {"category": "high_risk", "annex_iii_area": "employment", "must_cite": ["art-6", "annex-iii"]}
-    good = {"category": "high_risk", "annex_iii_area": "employment", "citations": ["art-6", "annex-iii", "art-5"],
-            "transparency_obligations": False}
+    good = {
+        "category": "high_risk",
+        "annex_iii_area": "employment",
+        "citations": ["art-6", "annex-iii", "art-5"],
+        "transparency_obligations": False,
+    }
     s = score_assessment(exp, good)
     assert s["passed"] and s["category_correct"] and s["area_correct"] and s["citation_recall"] == 1.0
     assert s["transparency_correct"] is None
     wrong_area = score_assessment(exp, {**good, "annex_iii_area": "education"})
     assert not wrong_area["passed"] and wrong_area["area_correct"] is False
-    t = score_assessment({"category": "limited_risk", "transparency": True, "must_cite": ["art-50"]},
-                         {"category": "limited_risk", "citations": [], "transparency_obligations": True, "annex_iii_area": "none"})
+    t = score_assessment(
+        {"category": "limited_risk", "transparency": True, "must_cite": ["art-50"]},
+        {
+            "category": "limited_risk",
+            "citations": [],
+            "transparency_obligations": True,
+            "annex_iii_area": "none",
+        },
+    )
     assert t["transparency_correct"] and t["citation_recall"] == 0.0 and not t["passed"]
 
 
 def test_summarise_and_judge_agreement():
-    scores = [{"passed": True, "category_correct": True, "area_correct": None, "transparency_correct": True, "citation_recall": 1.0},
-              {"passed": False, "category_correct": False, "area_correct": None, "transparency_correct": None, "citation_recall": 0.5}]
+    scores = [
+        {
+            "passed": True,
+            "category_correct": True,
+            "area_correct": None,
+            "transparency_correct": True,
+            "citation_recall": 1.0,
+        },
+        {
+            "passed": False,
+            "category_correct": False,
+            "area_correct": None,
+            "transparency_correct": None,
+            "citation_recall": 0.5,
+        },
+    ]
     s = summarise(scores)
-    assert s == {"n": 2, "pass_rate": 0.5, "category_accuracy": 0.5, "area_accuracy": None,
-                 "transparency_accuracy": 1.0, "mean_citation_recall": 0.75}
+    assert s == {
+        "n": 2,
+        "pass_rate": 0.5,
+        "category_accuracy": 0.5,
+        "area_accuracy": None,
+        "transparency_accuracy": 1.0,
+        "mean_citation_recall": 0.75,
+    }
     j = judge_agreement([True, True, False, False], [True, False, False, True])
     assert j == {"accuracy": 0.5, "tpr": 0.5, "tnr": 0.5}
     assert judge_agreement([True], [True])["tnr"] is None

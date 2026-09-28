@@ -24,9 +24,11 @@ def main():
     args = ap.parse_args()
     s = get_settings()
     import psycopg
+
     with psycopg.connect(s.database_url) as conn:
-        rows = conn.execute("SELECT input->>'description' FROM assessments ORDER BY created_at DESC LIMIT %s",
-                            (args.limit,)).fetchall()
+        rows = conn.execute(
+            "SELECT input->>'description' FROM assessments ORDER BY created_at DESC LIMIT %s", (args.limit,)
+        ).fetchall()
     recent = [r[0] for r in rows if r[0]]
     if len(recent) < 30:
         print(f"Only {len(recent)} recent inputs; need at least 30 for a meaningful check.")

@@ -9,6 +9,7 @@ data/raw/
 data/models/
 data/training/annex3.csv.bak
 mlruns/
+mlflow.db
 mlartifacts/
 evals/results/
 *.log

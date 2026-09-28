@@ -29,10 +29,12 @@ def build_index(in_memory: bool):
     if not in_memory:
         from app.retrieval.embed import OllamaEmbedder
         from app.retrieval.store import get_store
+
         return get_store(s), OllamaEmbedder(s)
     from app.ingest.pipeline import ingest_text
     from app.retrieval.embed import HashEmbedder
     from app.retrieval.store import InMemoryStore
+
     store, emb = InMemoryStore(), HashEmbedder(512)
     ingest_text(open("data/corpus/ai_act.txt", encoding="utf-8").read(), store, emb)
     return store, emb
@@ -59,13 +61,20 @@ def main():
             flags = rules.screen(profile)
             a = classifier.classify(profile, flags, store, emb, provider).model_dump()
         except Exception as e:
-            a = {"category": f"error: {type(e).__name__}", "citations": [], "annex_iii_area": "none",
-                 "transparency_obligations": False, "confidence": "low"}
+            a = {
+                "category": f"error: {type(e).__name__}",
+                "citations": [],
+                "annex_iii_area": "none",
+                "transparency_obligations": False,
+                "confidence": "low",
+            }
         sc = score_assessment(c["expected"], a)
         scores.append(sc)
         rows.append((c["id"], c["expected"]["category"], a["category"], a.get("annex_iii_area"), sc))
-        print(f"{'✓' if sc['passed'] else '✗'} {c['id']}  expected {c['expected']['category']:<13} got {a['category']:<13} "
-              f"area {a.get('annex_iii_area')}  citations {a.get('citations')}")
+        print(
+            f"{'✓' if sc['passed'] else '✗'} {c['id']}  expected {c['expected']['category']:<13} got {a['category']:<13} "
+            f"area {a.get('annex_iii_area')}  citations {a.get('citations')}  flags {a.get('flags')}"
+        )
 
     summary = summarise(scores)
     elapsed = time.perf_counter() - t0
@@ -74,8 +83,10 @@ def main():
     os.makedirs(os.path.dirname(args.report), exist_ok=True)
     with open(args.report, "w", encoding="utf-8") as f:
         f.write(f"## Scenario evals · {provider.name}/{provider.model}\n\n")
-        f.write(f"**Pass rate {summary['pass_rate']:.0%}** · category accuracy {summary['category_accuracy']} · "
-                f"mean citation recall {summary['mean_citation_recall']} · n = {summary['n']}\n\n")
+        f.write(
+            f"**Pass rate {summary['pass_rate']:.0%}** · category accuracy {summary['category_accuracy']} · "
+            f"mean citation recall {summary['mean_citation_recall']} · n = {summary['n']}\n\n"
+        )
         f.write("| id | expected | got | area | passed |\n|---|---|---|---|---|\n")
         for cid, exp, got, area, sc in rows:
             f.write(f"| {cid} | {exp} | {got} | {area} | {'✅' if sc['passed'] else '❌'} |\n")

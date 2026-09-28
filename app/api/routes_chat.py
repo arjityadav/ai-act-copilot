@@ -62,11 +62,10 @@ def chat(
         raise HTTPException(400, detail=guard.reason)
     question = redact_pii(req.question)
     trace_id = uuid.uuid4().hex
-    # TODO(Phase 7): restore once SemanticCache.get/put are implemented
-    # if cache is not None:
-    #     cached_response = cache.get(question)
-    #     if cached_response is not None:
-    #         return ChatResponse(**cached_response, cached=True, trace_id=trace_id)
+    if cache is not None:
+        cached_response = cache.get(question)
+        if cached_response is not None:
+            return ChatResponse(**cached_response, cached=True, trace_id=trace_id)
     result = answer_question(question, store, embedder, provider)
     response_dict = {
         "answer": result.answer,
@@ -77,8 +76,8 @@ def chat(
         "cached": False,
         "trace_id": trace_id,
     }
-    # if not result.refused and result.citations_valid and cache is not None:
-    #     cache.put(question, {k: v for k, v in response_dict.items() if k not in ["trace_id", "cached"]})
+    if not result.refused and result.citations_valid and cache is not None:
+        cache.put(question, {k: v for k, v in response_dict.items() if k not in ["trace_id", "cached"]})
     return ChatResponse(**response_dict)
 
 

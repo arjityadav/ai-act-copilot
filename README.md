@@ -37,7 +37,7 @@ flowchart LR
   I -->|complete| R[rules screen]
   R --> K[classifier agent<br/>RAG + citations]
   R --> M[ML pre-screen]
-  K --> O[obligations] 
+  K --> O[obligations]
   M --> O
   O --> G[gap analysis] --> W[writer] --> V[verifier]
   V -->|issues, < 3 tries| W

@@ -49,9 +49,9 @@ def test_redact_pii():
     assert "anna.schmidt" not in out and "[EMAIL]" in out
     assert "[PHONE]" in out and "1234567" not in out
     assert "[IBAN]" in out and "3704" not in out
-    assert (
-        redact_pii("Article 5 of Regulation 2024/1689") == "Article 5 of Regulation 2024/1689"
-    ), "don't redact legal references"
+    assert redact_pii("Article 5 of Regulation 2024/1689") == "Article 5 of Regulation 2024/1689", (
+        "don't redact legal references"
+    )
 
 
 def test_answer_question_with_fake_model():

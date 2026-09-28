@@ -13,3 +13,4 @@ mlflow.db
 mlartifacts/
 evals/results/
 *.log
+CLAUDE.md

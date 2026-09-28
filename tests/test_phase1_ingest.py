@@ -30,9 +30,9 @@ def test_parse_body_lines_exclude_title_and_keep_cross_references():
     by_id = {p.id: p for p in parse_act(sample_text())}
     assert by_id["art-1"].lines[0] == "1."
     assert "Subject matter" not in by_id["art-1"].lines
-    assert any(
-        "Article 6(2)" in ln for ln in by_id["art-5"].lines
-    ), "a cross-reference inside text is body text"
+    assert any("Article 6(2)" in ln for ln in by_id["art-5"].lines), (
+        "a cross-reference inside text is body text"
+    )
 
 
 def test_parse_duplicate_keeps_the_one_with_content():

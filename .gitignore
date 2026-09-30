@@ -16,3 +16,4 @@ mlartifacts/
 evals/results/
 *.log
 CLAUDE.md
+.deploy-failed

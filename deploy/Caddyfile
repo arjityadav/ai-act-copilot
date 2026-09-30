@@ -6,10 +6,15 @@
 {$DOMAIN} {
 	encode gzip
 
+	# Its own handle block: Caddy sorts directives by a fixed order in which `handle` runs before a
+	# bare `respond`, so `respond @metrics 404` alone would never be reached. handle blocks are
+	# mutually exclusive and evaluated in the order written.
 	@metrics path /metrics /metrics/*
-	respond @metrics 404
+	handle @metrics {
+		respond 404
+	}
 
-	@api path /docs /docs/* /openapi.json /redoc /health /ready /stats /chat /chat/* /assessments /assessments/* /feedback
+	@api path /docs /docs/* /openapi.json /redoc /health /ready /version /stats /chat /chat/* /assessments /assessments/* /feedback
 	handle @api {
 		reverse_proxy api:8000
 	}

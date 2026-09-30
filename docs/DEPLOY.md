@@ -131,3 +131,29 @@ receives occasional traffic is normally fine (see Oracle's current Always Free p
   and run `dcp up -d` (Caddy obtains a certificate for each name).
 - The UI is public: anyone can use it, which consumes the free LLM quota (no money at risk on a free
   tier). To restrict it, add `basic_auth` for the UI route in `deploy/Caddyfile`.
+
+## Continuous deployment (pull-based)
+The server deploys itself: a systemd timer runs `deploy/deploy.sh` every 2 minutes. It fetches
+`main`, and if there is a new commit **whose CI succeeded**, it fast-forwards, rebuilds, waits until
+the API and UI are healthy and `https://<DOMAIN>/version` reports the new commit, and otherwise
+**rolls back** to the previous commit (a failed commit is not retried until a newer one arrives).
+GitHub's `CD` workflow waits for `/version` to show the commit and smoke-tests the site.
+
+Why pull instead of push: SSH stays restricted to your own IP, and no server credentials are
+stored in GitHub.
+
+One-time setup on the server:
+```bash
+cd ~/ai-act-copilot && git pull
+echo "APP_VERSION=$(git rev-parse HEAD)" >> .env.prod        # the script keeps this line updated
+dcp up -d --build && dcp up -d --force-recreate caddy
+curl -s https://<DOMAIN>/version                               # shows the current commit
+
+sudo cp deploy/ai-act-deploy.service deploy/ai-act-deploy.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ai-act-deploy.timer
+systemctl list-timers ai-act-deploy.timer                      # next run in < 2 min
+```
+Watch deployments with `journalctl -u ai-act-deploy -f`. Run one immediately with
+`sudo systemctl start ai-act-deploy.service`. After changing the unit files, copy them again and run
+`sudo systemctl daemon-reload`.

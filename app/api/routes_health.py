@@ -1,4 +1,7 @@
-"""Health checks (given): /health for liveness (process is up), /ready for readiness (dependencies reachable)."""
+"""Health checks (given): /health for liveness (process is up), /ready for readiness (dependencies reachable).
+/version reports the deployed git commit (APP_VERSION is set by deploy/deploy.sh; CD waits for it)."""
+
+import os
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -11,6 +14,11 @@ router = APIRouter(tags=["health"])
 @router.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@router.get("/version")
+def version():
+    return {"version": os.environ.get("APP_VERSION", "dev")}
 
 
 @router.get("/ready")

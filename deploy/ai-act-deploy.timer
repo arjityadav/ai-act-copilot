@@ -1,0 +1,11 @@
+# Checks for a new green commit on main every 2 minutes.
+[Unit]
+Description=Check for new AI Act Copilot deployments
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,13 @@
+# Runs one deploy check (deploy/deploy.sh). Started by ai-act-deploy.timer.
+# Install: see docs/DEPLOY.md, section "Continuous deployment".
+[Unit]
+Description=AI Act Copilot pull-based deploy
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/ai-act-copilot
+ExecStart=/home/ubuntu/ai-act-copilot/deploy/deploy.sh
+TimeoutStartSec=30min

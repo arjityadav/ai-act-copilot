@@ -12,6 +12,7 @@
 
 x-app-env: &app-env
   APP_ENV: prod
+  APP_VERSION: ${APP_VERSION:-unknown}          # git commit, set by deploy/deploy.sh
   DATABASE_URL: postgresql://copilot:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/copilot
   REDIS_URL: redis://redis:6379/0
   OLLAMA_HOST: http://ollama:11434

@@ -97,3 +97,8 @@ def test_chat_redacts_pii_before_the_model():
 
 def test_health():
     assert _client(FakeProvider([])).get("/health").json() == {"status": "ok"}
+
+
+def test_version_reports_app_version(monkeypatch):
+    monkeypatch.setenv("APP_VERSION", "abc123")
+    assert _client(FakeProvider([])).get("/version").json() == {"version": "abc123"}

@@ -1,9 +1,11 @@
 name: CD
 
-# On every push to main (after CI passes): build and push the image to GitHub Container Registry,
-# deploy it, then smoke-test the live service. Rollback = redeploy the previous image tag.
-# Default target: Render (Frankfurt region; managed Postgres with pgvector + Key Value/Redis).
-# Other targets (Cloud Run, Azure Container Apps, Fly.io) only change the "Deploy" step: see docs/BLUEPRINT.md.
+# Pull-based continuous deployment (GitOps style):
+#   1. CI passes on main (this workflow waits for that)
+#   2. The server's systemd timer (deploy/ai-act-deploy.timer) sees the new green commit, pulls,
+#      rebuilds, health-checks it and rolls back automatically if it is unhealthy (deploy/deploy.sh)
+#   3. This workflow waits until the live site reports the new commit on /version
+# The server pulls, so SSH stays restricted to the maintainer's IP and no deploy secrets live in GitHub.
 
 on:
   workflow_run:
@@ -13,37 +15,38 @@ on:
 
 permissions:
   contents: read
-  packages: write
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: true   # a newer commit supersedes an older one still being verified
 
 jobs:
-  deploy:
-    if: github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    environment: production
+  verify-deployment:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-24.04
+    environment:
+      name: production
+      url: ${{ vars.PUBLIC_URL || 'https://ai-act-copilot.duckdns.org' }}
+    timeout-minutes: 25
+    env:
+      PUBLIC_URL: ${{ vars.PUBLIC_URL || 'https://ai-act-copilot.duckdns.org' }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
-            ghcr.io/${{ github.repository }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Deploy (Render deploy hook pointing at the new image)
-        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}&imgURL=ghcr.io/${{ github.repository }}:${{ github.sha }}"
-      - name: Smoke test
+      - name: Wait for the server to deploy this commit
         run: |
-          for i in $(seq 1 30); do
-            if curl -fsS "${{ vars.PUBLIC_URL }}/health"; then exit 0; fi
+          echo "Waiting for $PUBLIC_URL/version to report $SHA"
+          for i in $(seq 1 120); do
+            live=$(curl -fsS -m 10 "$PUBLIC_URL/version" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' || true)
+            if [ "$live" = "$SHA" ]; then echo "Live: $live"; exit 0; fi
+            echo "[$i] live=${live:-unreachable}"
             sleep 10
           done
-          echo "Service did not become healthy" && exit 1
+          echo "::error::The server did not deploy $SHA within 20 minutes (build failed or rolled back: check journalctl -u ai-act-deploy on the server)"
+          exit 1
+      - name: Smoke test
+        run: |
+          curl -fsS "$PUBLIC_URL/health"
+          curl -fsS -o /dev/null "$PUBLIC_URL/"                               # the UI
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$PUBLIC_URL/chat" \
+                  -H 'Content-Type: application/json' -d '{"question":"x"}')" = "401"   # API still requires a key
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$PUBLIC_URL/metrics")" = "404"

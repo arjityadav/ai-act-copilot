@@ -710,3 +710,15 @@ It's OK when **nobody else depends on the history** (a solo repo or unshared bra
 ### 4. Why is port 80 open if everything is HTTPS?
 
 **Answer.** Let's Encrypt's HTTP-01 challenge verifies domain control on **port 80** before issuing a certificate, and Caddy uses 80 to **redirect** HTTP to HTTPS. `sslip.io` maps `130-61-1-2.sslip.io` to that IP via DNS, so a real certificate works without buying a domain.
+
+### 5. How do the UI and the API share one domain? What went wrong along the way?
+
+**Answer.** Caddy routes by path: `/docs`, `/chat`, `/assessments`, … go to FastAPI; everything else goes to the **Streamlit UI**; `/metrics` returns 404 (Prometheus metrics are internal). The UI calls the API **server-side over Docker's internal network** with the server's API key, so users never see the key; the API stays key-protected for direct calls. The domain is a free **DuckDNS** subdomain pointing at the VM's IP; Caddy gets a certificate for each listed name.
+
+**Three lessons from getting it live:**
+
+1. **Directive order in Caddy isn't the written order.** `respond @metrics 404` never fired, because Caddy sorts directives by a fixed order in which `handle` runs first, so `/metrics` fell through to the UI. Fix: put it in its own `handle` block (handle blocks are mutually exclusive and evaluated as written), then verify with `caddy adapt`, which shows the compiled route order.
+2. **Single-file bind mounts go stale.** After `git pull`, the Caddy container still served the old config: `git` replaces the file (a new inode), and a container that mounted the old file keeps seeing it. Recreate the container (`up -d --force-recreate caddy`), or mount a directory.
+3. **Streamlit reruns the whole script on every interaction.** Feedback buttons nested inside `if st.button("Ask")` could never fire, because on the rerun "Ask" is `False`. The answer is now kept in `st.session_state`, and the buttons use `on_click` callbacks.
+
+Also: the image's `HEALTHCHECK` probes the API port, so the UI container (like the worker earlier) needs its own healthcheck (`/_stcore/health`).

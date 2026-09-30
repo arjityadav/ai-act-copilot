@@ -722,3 +722,19 @@ It's OK when **nobody else depends on the history** (a solo repo or unshared bra
 3. **Streamlit reruns the whole script on every interaction.** Feedback buttons nested inside `if st.button("Ask")` could never fire, because on the rerun "Ask" is `False`. The answer is now kept in `st.session_state`, and the buttons use `on_click` callbacks.
 
 Also: the image's `HEALTHCHECK` probes the API port, so the UI container (like the worker earlier) needs its own healthcheck (`/_stcore/health`).
+
+### 6. How does your continuous deployment work? Why pull-based?
+
+**Answer.** **Pull-based (GitOps-style).** A systemd **timer** on the server runs `deploy/deploy.sh` every 2 minutes:
+
+1. `git fetch`; if `main` has a new commit, ask the GitHub API whether its **CI workflow succeeded**. Only green commits deploy.
+2. Fast-forward, rebuild (`compose up -d --build`), recreate Caddy (single-file mount), record the commit as `APP_VERSION`.
+3. **Health gate:** the API and UI containers must be healthy **and** the public `/version` must report the new commit.
+4. Otherwise **automatic rollback** to the previous commit. The failed commit is remembered so the timer doesn't redeploy and roll back in a loop; a newer commit replaces it.
+5. A lock (`flock`) prevents overlapping deploys; old images are pruned.
+
+GitHub's `CD` workflow waits until `/version` shows the commit, then smoke-tests the live site (UI loads, `/chat` without a key is 401, `/metrics` is 404).
+
+**Why pull instead of push (Actions SSHing in):** I had restricted SSH to my own IP, and GitHub runners use thousands of changing IPs. Push-based CD would mean opening SSH to the internet and storing a server key in GitHub. With pull, the server needs **no inbound access** and GitHub holds **no credentials**. Trade-offs: up to ~2 minutes of delay, and the server builds images itself (a registry and pre-built images would be the next step for bigger systems). Kubernetes GitOps tools (Argo CD, Flux) use the same pull principle.
+
+**Debugging story:** `systemctl enable` failed with a vague "bad unit file setting". `systemd-analyze verify` pinpointed it: the `.timer` file contained the `.service` content (a copy mix-up). **When an error is vague, use the tool's own checker** (`compose config`, `caddy validate`/`adapt`, `systemd-analyze verify`).

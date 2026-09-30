@@ -121,3 +121,13 @@ Swagger UI: `https://<DOMAIN>/docs`.
 
 Oracle may reclaim Always Free VMs that stay almost completely idle for a long time; a demo that
 receives occasional traffic is normally fine (see Oracle's current Always Free policy).
+
+## Web UI and a friendly name
+- The stack includes the **Streamlit UI** (`ui` service). Caddy routes `/` to the UI and the API
+  paths (`/docs`, `/chat`, `/assessments`, ...) to FastAPI; `/metrics` is blocked. The UI calls the
+  API over Docker's internal network with the server's `API_KEY`, so users never see the key.
+- Free name: create a subdomain at [duckdns.org](https://www.duckdns.org) pointing to the VM's public
+  IP, then list it in `.env.prod`, e.g. `DOMAIN=ai-act-copilot.duckdns.org, 141.147.32.252.sslip.io`,
+  and run `dcp up -d` (Caddy obtains a certificate for each name).
+- The UI is public: anyone can use it, which consumes the free LLM quota (no money at risk on a free
+  tier). To restrict it, add `basic_auth` for the UI route in `deploy/Caddyfile`.

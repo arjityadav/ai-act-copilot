@@ -38,7 +38,7 @@ services:
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
-    depends_on: [api]
+    depends_on: [api, ui]
     restart: unless-stopped
 
   api:
@@ -69,6 +69,25 @@ services:
       db: {condition: service_healthy}
       redis: {condition: service_healthy}
     mem_limit: 700m
+    restart: unless-stopped
+
+  ui:
+    build: .
+    # The image doesn't contain ui/, so it is mounted from the cloned repo (read-only).
+    command: ["streamlit", "run", "ui/streamlit_app.py", "--server.port", "8501", "--server.address", "0.0.0.0",
+              "--server.headless", "true", "--browser.gatherUsageStats", "false"]
+    environment:
+      API_URL: http://api:8000                        # internal Docker network, never through the internet
+      API_KEY: ${API_KEY:?set API_KEY}                # the UI calls the API server-side: users never see the key
+    volumes: ["./ui:/app/ui:ro"]
+    healthcheck:   # the image's HEALTHCHECK probes the API port 8000; Streamlit serves its own on 8501
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      api: {condition: service_healthy}
+    mem_limit: 500m
     restart: unless-stopped
 
   db:

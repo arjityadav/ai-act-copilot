@@ -20,34 +20,43 @@ st.caption("Decision support, not legal advice. Always have a qualified person r
 
 tab_ask, tab_assess = st.tabs(["Ask the AI Act", "Assess an AI system"])
 
+
+def send_feedback(trace_id: str, rating: int) -> None:
+    httpx.post(
+        f"{API}/feedback", json={"target": f"chat:{trace_id}", "rating": rating}, headers=HEADERS, timeout=10
+    )
+    st.session_state["feedback_sent"] = trace_id
+
+
 with tab_ask:
     q = st.text_input("Question", placeholder="Do I have to tell users they are talking to a chatbot?")
     if st.button("Ask", type="primary") and q:
         with st.spinner("Searching the regulation..."):
             r = httpx.post(f"{API}/chat", json={"question": q}, headers=HEADERS, timeout=180)
         if r.status_code != 200:
+            st.session_state.pop("chat", None)
             st.error(r.text)
         else:
-            data = r.json()
-            st.markdown(data["answer"])
-            if not data["citations_valid"]:
-                st.warning("Some citations could not be verified against the retrieved text.")
-            with st.expander("Sources"):
-                for s in data["sources"]:
-                    st.write(f"[{s['n']}] {s['citation']} · {s['title']}")
+            st.session_state["chat"] = r.json()
+
+    # Streamlit reruns the whole script on every click, and on that rerun st.button("Ask") is False.
+    # Keeping the answer in session_state lets it (and the feedback buttons) survive the rerun.
+    data = st.session_state.get("chat")
+    if data:
+        st.markdown(data["answer"])
+        if data.get("cached"):
+            st.caption("Answered from the semantic cache.")
+        if not data["citations_valid"]:
+            st.warning("Some citations could not be verified against the retrieved text.")
+        with st.expander("Sources"):
+            for s in data["sources"]:
+                st.write(f"[{s['n']}] {s['citation']} · {s['title']}")
+        if st.session_state.get("feedback_sent") == data["trace_id"]:
+            st.success("Thanks for the feedback!")
+        else:
             c1, c2 = st.columns(2)
-            if c1.button("👍 Helpful"):
-                httpx.post(
-                    f"{API}/feedback",
-                    json={"target": f"chat:{data['trace_id']}", "rating": 1},
-                    headers=HEADERS,
-                )
-            if c2.button("👎 Not helpful"):
-                httpx.post(
-                    f"{API}/feedback",
-                    json={"target": f"chat:{data['trace_id']}", "rating": -1},
-                    headers=HEADERS,
-                )
+            c1.button("👍 Helpful", on_click=send_feedback, args=(data["trace_id"], 1))
+            c2.button("👎 Not helpful", on_click=send_feedback, args=(data["trace_id"], -1))
 
 with tab_assess:
     desc = st.text_area(

@@ -1,6 +1,21 @@
-# Caddy gets and renews a Let's Encrypt certificate for $DOMAIN automatically.
-# Without your own domain, use <public-ip-with-dashes>.sslip.io, e.g. 203-0-113-10.sslip.io
+# Caddy gets and renews a Let's Encrypt certificate for every name in $DOMAIN automatically
+# (comma-separated, e.g. "ai-act-copilot.duckdns.org, 141.147.32.252.sslip.io").
+#   /                     -> Streamlit UI (for people)
+#   /docs, /chat, ...     -> FastAPI (for developers and the UI)
+#   /metrics              -> blocked: Prometheus metrics are internal
 {$DOMAIN} {
 	encode gzip
-	reverse_proxy api:8000
+
+	@metrics path /metrics /metrics/*
+	respond @metrics 404
+
+	@api path /docs /docs/* /openapi.json /redoc /health /ready /stats /chat /chat/* /assessments /assessments/* /feedback
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	# Everything else is the UI. Streamlit uses a websocket (/_stcore/stream); Caddy proxies it as-is.
+	handle {
+		reverse_proxy ui:8501
+	}
 }

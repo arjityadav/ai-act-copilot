@@ -6,7 +6,7 @@
 
 FastAPI · LangGraph · PostgreSQL + pgvector · Redis/RQ · Ollama / Claude / OpenAI · scikit-learn + MLflow · Docker · GitHub Actions · Prometheus + Grafana
 
-**Live demo:** [141.147.32.252.sslip.io/docs](https://141.147.32.252.sslip.io/docs), the interactive API docs (Swagger UI). The endpoints require an API key, available on request. Deployed on Oracle Cloud (Always Free, Frankfurt) with `openai/gpt-oss-120b` on Groq; see [docs/DEPLOY.md](docs/DEPLOY.md).
+**Live demo:** [ai-act-copilot.duckdns.org](https://ai-act-copilot.duckdns.org): ask the AI Act or assess an AI system in the web UI (Streamlit). API docs: [/docs](https://ai-act-copilot.duckdns.org/docs); calling the API directly requires an API key. Deployed on Oracle Cloud (Always Free, Frankfurt) with `openai/gpt-oss-120b` on Groq's free tier, so it can be slow or rate-limited under load; see [docs/DEPLOY.md](docs/DEPLOY.md).
 
 > Decision support, not legal advice. Every answer cites the regulation; every report is verified in code and must be reviewed by a qualified person.
 

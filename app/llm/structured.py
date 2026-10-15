@@ -1,4 +1,4 @@
-"""Structured output for any provider (given): JSON schema in the request, Pydantic validation, retries.
+"""Structured output for any provider: JSON schema in the request, Pydantic validation, retries.
 
 profile = complete_structured(provider, messages, SystemProfile, system="...")
 """

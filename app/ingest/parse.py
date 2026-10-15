@@ -1,6 +1,4 @@
-"""PHASE 1 · Parse the regulation into provisions (articles and annexes).
-
-Read first: notes Days 53 (documents) and 56 (parsing & chunking).
+"""Parse the regulation into provisions (articles and annexes).
 
 After html_to_text(), the Act is one line per text block. The structure you need looks like:
 

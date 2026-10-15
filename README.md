@@ -84,7 +84,7 @@ flowchart LR
   V -->|passed| F[finish] --> E
 ```
 
-Full design: **[docs/BLUEPRINT.md](docs/BLUEPRINT.md)**
+Design decisions and build notes: **[Process.md](Process.md)**
 
 ## Quick start
 
@@ -113,20 +113,20 @@ make eval-retrieval   # recall@5 and MRR per retrieval method
 
 More commands: `make train` (train, log to MLflow, promote if better), `make evals` (scenario evals), `make drift`, `make load`, `make lint`, `make help`.
 
-## Project structure and scope
+## Components
 
-Built in phases on a structured starter template: the scaffolding (Docker/Compose, FastAPI app, database access, workflows) was provided, and the core logic was implemented phase by phase, each phase defined by its tests. Beyond the phases, the fixes described under *Error analysis* came from running and measuring the system.
-
-| Phase | Scope | Status |
+| Component | Scope | Tests |
 |---|---|---|
-| 1 | Parse the Act; legal-aware chunking; idempotent ingestion | ✅ |
-| 2 | Hybrid search (RRF), recall@k, MRR | ✅ |
-| 3 | Grounded answers, citation checks, guardrails, PII redaction, `POST /chat` | ✅ |
-| 4 | Rules screen, intake agent, classifier agent with code-level verification | ✅ |
-| 5 | Obligations, gap analysis, verifier, LangGraph orchestration | ✅ |
-| 6 | MLOps: training data review, training, MLflow registry gate, drift | ✅ |
-| 7 | LLMOps: eval scoring, semantic cache, provider fallback | ✅ |
-| 8 | Prometheus metrics; CI/CD; deployment (Oracle Cloud + Groq, HTTPS via Caddy) | ✅ · load test pending |
+| Ingestion | parse the Act, legal-aware chunking, idempotent ingestion | `tests/test_ingest.py` |
+| Retrieval | hybrid search (pgvector + full-text + RRF), recall@k, MRR | `tests/test_retrieval.py` |
+| RAG API | grounded answers, citation checks, guardrails, PII redaction, `POST /chat` | `tests/test_rag_api.py` |
+| Agents | rules screen, intake agent, classifier agent with code-level verification | `tests/test_agents.py` |
+| Assessment pipeline | obligations, gap analysis, verifier, LangGraph orchestration | `tests/test_pipeline.py` |
+| MLOps | training data review, training, MLflow registry gate, drift | `tests/test_mlops.py` |
+| LLMOps | eval scoring, semantic cache, provider fallback | `tests/test_llmops.py` |
+| Observability and delivery | Prometheus metrics, CI/CD, deployment (Oracle Cloud + Groq, HTTPS via Caddy) | `tests/test_observability.py` · load test pending |
+
+The project started from a starter template that provided the scaffolding (Docker/Compose, the FastAPI app shell, database access, CI workflows); the components above, the fixes under *Error analysis*, the production deployment, the web UI in production and continuous deployment were implemented on top of it.
 | 9 | Results, docs, demo | in progress |
 
 ## Limitations and future work
@@ -156,10 +156,10 @@ prompts/          versioned prompt files
 data/             obligations table, reviewed training data (+ review audit script)
 evals/            retrieval eval set, assessment scenarios, runner
 scripts/          ingest, retrieval eval, training data, training, drift check
-tests/            one file per phase + integration tests
+tests/            one file per component + integration tests
 monitoring/       Prometheus config, Grafana provisioning + dashboard
 .github/workflows CI (lint, tests, integration, eval gate, build), CD, weekly drift check
-docs/             blueprint, model card, AI Act self-assessment, runbook
+docs/             deployment guide, runbook, model card, AI Act self-assessment
 ```
 
 ## License and disclaimer

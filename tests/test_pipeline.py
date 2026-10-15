@@ -1,5 +1,5 @@
-"""Phase 5 · Multi-agent pipeline: obligations, gaps, verifier, LangGraph wiring, assessment API.
-make test-phase P=5   (the graph tests need langgraph installed: uv sync)"""
+"""Assessment pipeline: obligations, gaps, verifier, LangGraph wiring, assessment API.
+(The graph tests need langgraph installed: uv sync.)"""
 
 from datetime import date
 

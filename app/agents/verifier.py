@@ -1,6 +1,4 @@
-"""PHASE 5 · Verifier agent: checks the report in code before anyone sees it.
-
-Read first: notes Days 50 (LLM-as-judge), 59 (verifying citations), 67 (evaluator–optimiser pattern).
+"""Verifier agent: checks the report in code before anyone sees it.
 
 The writer is an LLM and can hallucinate an article number or skip the disclaimer. The
 verifier catches that deterministically; if it fails, the graph sends its issues back to the

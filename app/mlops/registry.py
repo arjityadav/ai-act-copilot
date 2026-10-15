@@ -1,4 +1,4 @@
-"""PHASE 6 · Model registry: promote a new version only if it's good enough and better.
+"""Model registry: promote a new version only if it's good enough and better.
 
 A promotion gate is the MLOps equivalent of a code review: no model reaches production
 because someone happened to run a script. The "champion" alias points at the production version.
@@ -39,7 +39,7 @@ def should_promote(
 
 
 def promote(version: str, candidate_metrics: dict, name: str = "annex3-classifier") -> tuple[bool, str]:
-    """(given) Compare with the current champion in MLflow and move the alias if the gate passes."""
+    """Compare with the current champion in MLflow and move the alias if the gate passes."""
     from mlflow import MlflowClient
 
     client = MlflowClient()

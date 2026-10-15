@@ -1,6 +1,4 @@
-"""PHASE 7 · Semantic cache for /chat.
-
-Read first: notes Day 87 (performance & cost at scale: caching risks).
+"""Semantic cache for /chat.
 
 Many users ask the same things ("Is my chatbot high-risk?"). If a new question's embedding is
 very close to a cached one, return the cached answer: zero LLM cost, ~10 ms. The risk: two

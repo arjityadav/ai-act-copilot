@@ -1,4 +1,4 @@
-"""Assessment endpoints (given).
+"""Assessment endpoints.
 
 POST /assessments                {description, practices?}     -> 202 {id, status}
 GET  /assessments/{id}           status, questions or result

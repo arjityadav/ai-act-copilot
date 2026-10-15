@@ -1,4 +1,4 @@
-"""PHASE 5 · Obligations agent: classification -> the obligations that apply (deterministic).
+"""Obligations agent: classification -> the obligations that apply (deterministic).
 
 Obligations come from a curated table (data/obligations.yaml) instead of the LLM: when the
 answer must be exact and auditable, look it up; don't generate it.

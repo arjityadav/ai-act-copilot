@@ -1,10 +1,8 @@
-"""PHASE 6 · Train and evaluate the Annex III area classifier.
-
-Read first: reading pack Days 13–17 (framing, regularisation, metrics, pipelines), notes Days 29 (experiment tracking), 84 (fine-tune vs prompt).
+"""Train and evaluate the Annex III area classifier.
 
 Why a classic model inside an LLM product? It is fast (milliseconds), free, deterministic,
 and gives a second opinion: when it disagrees with the LLM classifier, the assessment gets a
-flag for human review. It also gives you a real MLOps lifecycle to show: versioned data,
+flag for human review. It also has a full MLOps lifecycle: versioned data,
 tracked experiments, a registry with a promotion gate, monitoring and retraining.
 
 Data: data/training/annex3.csv with columns text,label (seed file included; grow it with
@@ -28,7 +26,7 @@ DATA = os.path.join(
 
 
 def load_dataset(path: str | None = None):
-    """(given) -> (texts, labels) as lists."""
+    """Load the dataset -> (texts, labels) as lists."""
     import csv
 
     path = path or os.path.join(DATA, "annex3.csv")
@@ -40,7 +38,7 @@ def load_dataset(path: str | None = None):
 
 
 def split(texts, labels, test_size=0.25, seed=42):
-    """(given) Stratified split so every label appears in both sets."""
+    """Stratified split so every label appears in both sets."""
     return train_test_split(texts, labels, test_size=test_size, random_state=seed, stratify=labels)
 
 
@@ -71,7 +69,7 @@ def evaluate(model, texts, labels) -> dict:
 
 
 def train_and_log(C: float = 4.0, data_path: str | None = None, register: bool = True) -> dict:
-    """(given) Train, evaluate, log to MLflow (if installed), register a new model version.
+    """Train, evaluate, log to MLflow (if installed), register a new model version.
     Returns {"metrics": ..., "run_id": ..., "version": ...}."""
     texts, labels = load_dataset(data_path)
     X_tr, X_te, y_tr, y_te = split(texts, labels)

@@ -1,4 +1,4 @@
-"""The ingestion pipeline (given): text -> provisions -> chunks -> embeddings -> store.
+"""The ingestion pipeline: text -> provisions -> chunks -> embeddings -> store.
 
 Idempotent: re-running with the same text changes nothing; changed articles are re-embedded
 (the store compares content hashes); provisions that disappeared are deleted.

@@ -1,4 +1,4 @@
-"""Report writer agent (given): turns the structured results into a readable Markdown report. The disclaimer is appended in code, not generated."""
+"""Report writer agent: turns the structured results into a readable Markdown report. The disclaimer is appended in code, not generated."""
 
 from __future__ import annotations
 

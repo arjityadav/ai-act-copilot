@@ -1,4 +1,4 @@
-"""Grow the classifier's training data with synthetic examples (Phase 6).
+"""Grow the classifier's training data with synthetic examples.
 
     uv run python scripts/generate_training_data.py --per-label 60
 

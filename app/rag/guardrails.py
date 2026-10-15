@@ -1,11 +1,9 @@
-"""PHASE 3 · Input guardrails.
-
-Read first: notes Days 76 (prompt injection) and 88 (security & guardrails, OWASP LLM Top 10).
+"""Input guardrails.
 
 Users paste descriptions of their AI systems. That text goes into prompts, so treat it as
 untrusted: limit size, flag obvious injection attempts, and redact personal data before it
 reaches a model or the logs. Heuristics catch the lazy attacks; real defence comes from
-least privilege and architecture (Phase 5 and 8), not from these checks alone.
+least privilege and architecture (code-level verification, network isolation), not from these checks alone.
 """
 
 from __future__ import annotations

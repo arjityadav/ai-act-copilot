@@ -1,6 +1,4 @@
-"""PHASE 5 · Multi-agent orchestration with LangGraph.
-
-Read first: notes Days 73 (frameworks), 74 (multi-agent), 67 (patterns). LangGraph docs: StateGraph.
+"""Multi-agent orchestration with LangGraph.
 
 The pipeline (you wire it in build_graph):
 
@@ -11,7 +9,7 @@ The pipeline (you wire it in build_graph):
                                                                                   finish -> END   <-+ (passed or out of attempts)
 
 Each node is a small function that reads the shared state and returns the keys it updates.
-The node functions are given (make_nodes); you write the two routing functions and build_graph.
+make_nodes builds the node functions; the routing functions and build_graph wire them together.
 """
 
 from __future__ import annotations
@@ -30,7 +28,7 @@ class PipelineState(TypedDict, total=False):
     practices: dict  # obligation id -> "yes" | "partial" | "no"
     profile: Any  # SystemProfile
     flags: list
-    ml_prediction: dict | None  # {"label": ..., "probability": ...} from the Phase 6 model
+    ml_prediction: dict | None  # {"label": ..., "probability": ...} from the ML classifier
     assessment: Any  # RiskAssessment
     obligations: list
     gaps: list
@@ -63,7 +61,7 @@ class PipelineDeps:
 
 
 def make_nodes(deps: PipelineDeps) -> dict:
-    """The agents as graph nodes (given)."""
+    """The agents as graph nodes."""
 
     def intake_node(state):
         deps.emit("intake", "Reading the system description")

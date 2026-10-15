@@ -1,4 +1,4 @@
-"""LLM call tracing (given): wraps a provider so every call is recorded with tokens, latency,
+"""LLM call tracing: wraps a provider so every call is recorded with tokens, latency,
 cost, agent and prompt version. Records go to Postgres (llm_calls table), and to Langfuse
 when LANGFUSE_ENABLED=true (set LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST).
 

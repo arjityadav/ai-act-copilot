@@ -1,4 +1,4 @@
-"""Drift check (Phase 6): compare recent assessment inputs with the training data.   make drift
+"""Drift check: compare recent assessment inputs with the training data.   make drift
 
 Reads the last N assessment descriptions from Postgres, predicts their Annex III area with the
 served classifier, and computes PSI for description length and predicted labels.

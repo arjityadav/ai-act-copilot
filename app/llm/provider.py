@@ -1,4 +1,4 @@
-"""LLM providers behind one interface (given).
+"""LLM providers behind one interface.
 
 Why an interface: develop for free with Ollama, deploy with a cloud API, switch or fall
 back without touching agent code, and test everything with FakeProvider.
@@ -224,7 +224,7 @@ def make_provider(name: str, settings: Settings | None = None) -> LLMProvider:
 
 
 def get_provider(settings: Settings | None = None) -> LLMProvider:
-    """One provider, or a FallbackProvider when LLM_PROVIDERS lists several (Phase 7)."""
+    """One provider, or a FallbackProvider when LLM_PROVIDERS lists several."""
     settings = settings or get_settings()
     names = [n.strip() for n in settings.llm_providers.split(",") if n.strip()]
     if len(names) == 1:

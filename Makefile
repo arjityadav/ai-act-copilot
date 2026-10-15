@@ -1,4 +1,4 @@
-.PHONY: help setup up down models migrate ingest dev worker test test-phase lint typecheck eval-retrieval evals train drift load ui
+.PHONY: help setup up down models migrate ingest dev worker test lint typecheck eval-retrieval evals train drift load ui
 
 help:          ## Show commands
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -32,9 +32,6 @@ worker:        ## Run a background worker locally
 
 test:          ## Run all unit tests (no services needed)
 	uv run pytest -q
-
-test-phase:    ## Run one phase's tests: make test-phase P=2
-	uv run pytest -q tests/test_phase$(P)_*.py
 
 integration:   ## Integration tests against the running stack (make up first)
 	uv run pytest -q -m integration

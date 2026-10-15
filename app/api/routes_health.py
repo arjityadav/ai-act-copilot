@@ -1,4 +1,4 @@
-"""Health checks (given): /health for liveness (process is up), /ready for readiness (dependencies reachable).
+"""Health checks: /health for liveness (process is up), /ready for readiness (dependencies reachable).
 /version reports the deployed git commit (APP_VERSION is set by deploy/deploy.sh; CD waits for it)."""
 
 import os

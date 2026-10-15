@@ -1,4 +1,4 @@
-"""Streamlit UI (given). Talks to the API only, like any other client.
+"""Streamlit UI. Talks to the API only, like any other client.
 
 make ui            (docker, http://localhost:8501)
 or: API_URL=http://localhost:8000 streamlit run ui/streamlit_app.py

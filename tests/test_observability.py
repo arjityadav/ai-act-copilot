@@ -1,4 +1,4 @@
-"""Phase 8 · Observability: Prometheus metrics.   make test-phase P=8"""
+"""Observability: Prometheus HTTP and LLM metrics."""
 
 from fastapi.testclient import TestClient
 

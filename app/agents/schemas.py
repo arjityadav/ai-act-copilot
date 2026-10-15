@@ -1,4 +1,4 @@
-"""Data contracts between agents (given). Every agent reads and writes these Pydantic models,
+"""Data contracts between agents. Every agent reads and writes these Pydantic models,
 so each step is validated and the whole pipeline is inspectable and testable."""
 
 from __future__ import annotations

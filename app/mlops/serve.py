@@ -1,4 +1,4 @@
-"""Serving the classifier (given): load the MLflow "champion", or a local file as fallback."""
+"""Serving the classifier: load the MLflow "champion", or a local file as fallback."""
 
 from __future__ import annotations
 

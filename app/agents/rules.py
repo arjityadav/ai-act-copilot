@@ -1,6 +1,4 @@
-"""PHASE 4 · Deterministic screening rules.
-
-Read first: notes Day 67 (workflows vs agents), supplement S7 (EU AI Act).
+"""Deterministic screening rules.
 
 LLMs are good at reading messy descriptions; plain code is good at applying fixed rules the
 same way every time. Combining both is a core agent-design pattern: the rules run first, their

@@ -1,4 +1,4 @@
-"""Dependency providers (given). Tests replace these with app.dependency_overrides."""
+"""Dependency providers. Tests replace these with app.dependency_overrides."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def assessments_dep():
 
 @lru_cache
 def cache_dep():
-    """Semantic cache for /chat (Phase 7). None until you've built it."""
+    """Semantic cache for /chat, shared across requests; None if it can't be created."""
     try:
         from app.llmops.cache import SemanticCache
 

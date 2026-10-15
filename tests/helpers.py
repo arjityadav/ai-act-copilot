@@ -35,7 +35,7 @@ def make_chunk(provision_id, text, title="Title", idx=0):
 
 
 def small_corpus():
-    """An InMemoryStore with hand-written chunks (doesn't depend on your Phase 1 code)."""
+    """An InMemoryStore with hand-written chunks (independent of the ingestion pipeline)."""
     chunks = [
         make_chunk(
             "art-5",

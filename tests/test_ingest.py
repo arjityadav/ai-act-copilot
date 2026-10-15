@@ -1,4 +1,4 @@
-"""Phase 1 · Ingestion.   make test-phase P=1"""
+"""Ingestion: parsing the Act, legal-aware chunking, idempotent ingest."""
 
 from app.ingest.chunk import chunk_provision, header_for, split_paragraphs
 from app.ingest.parse import Provision, parse_act

@@ -1,4 +1,4 @@
-"""Embeddings (given). OllamaEmbedder for real use; HashEmbedder for fast, deterministic tests."""
+"""Embeddings. OllamaEmbedder for real use; HashEmbedder for fast, deterministic tests."""
 
 from __future__ import annotations
 

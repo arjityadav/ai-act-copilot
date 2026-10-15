@@ -1,6 +1,4 @@
-"""PHASE 2 · Hybrid retrieval and retrieval metrics.
-
-Read first: notes Days 51 (vector search), 52 (keyword & hybrid), 57 (measuring retrieval), 58 (reranking).
+"""Hybrid retrieval and retrieval metrics.
 
 Legal questions mix exact terms ("Annex III", "Article 50", "CE marking") with meaning
 ("can I use AI to screen job applicants?"). Keyword search nails the first, embeddings the
@@ -68,7 +66,7 @@ def mrr(retrieved: list[str], relevant: list[str]) -> float:
 
 
 class CrossEncoderReranker:
-    """Optional (given): pip install ".[rerank]". Runs on CPU; ~0.2-1 s for 30 chunks."""
+    """Optional: pip install ".[rerank]". Runs on CPU; ~0.2-1 s for 30 chunks."""
 
     def __init__(self, model="cross-encoder/ms-marco-MiniLM-L-6-v2"):
         from sentence_transformers import CrossEncoder

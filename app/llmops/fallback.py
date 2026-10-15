@@ -1,6 +1,4 @@
-"""PHASE 7 · Provider fallback: if the primary model fails, use the next one.
-
-Read first: notes Day 47 (reliability), Day 87 (routing).
+"""Provider fallback: if the primary model fails, use the next one.
 
 LLM_PROVIDERS=anthropic,openai,ollama  -> try Claude, then OpenAI, then the local model.
 A provider outage should degrade quality or cost, not take the product down.

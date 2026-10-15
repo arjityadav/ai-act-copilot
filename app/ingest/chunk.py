@@ -1,6 +1,4 @@
-"""PHASE 1 · Chunk provisions for retrieval.
-
-Read first: notes Day 56 (chunking) and the contextual-retrieval idea (Day 56, 62).
+"""Chunk provisions for retrieval.
 
 Legal-aware chunking: split an article at its numbered paragraphs ("1.", "2.", ...), pack
 paragraphs together up to a size limit, and give every chunk a header saying where it comes

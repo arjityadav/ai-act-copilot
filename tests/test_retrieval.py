@@ -1,4 +1,4 @@
-"""Phase 2 · Retrieval.   make test-phase P=2"""
+"""Retrieval: Reciprocal Rank Fusion, hybrid search, recall@k and MRR."""
 
 from app.retrieval.search import hybrid_search, mrr, recall_at_k, rrf
 from tests.helpers import small_corpus

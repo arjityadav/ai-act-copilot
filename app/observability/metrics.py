@@ -1,10 +1,9 @@
-"""PHASE 8 · Prometheus metrics.
+"""Prometheus metrics.
 
-Read first: notes Days 85 (observability), 90 (quality dashboard). Prometheus scrapes GET /metrics
-every 15 s (monitoring/prometheus.yml); Grafana charts it (monitoring/grafana/).
+Prometheus scrapes GET /metrics every 15 s (monitoring/prometheus.yml); Grafana charts it (monitoring/grafana/).
 
 The four golden signals for an API: traffic, errors, latency, saturation. For an LLM product,
-add tokens and cost per provider. The metric objects are given; you record into them.
+add tokens and cost per provider.
 """
 
 from __future__ import annotations
@@ -37,7 +36,7 @@ LLM_LATENCY = Histogram(
 
 
 def route_label(request) -> str:
-    """(given) Use the route template ("/assessments/{aid}"), not the raw path, so ids don't create
+    """Use the route template ("/assessments/{aid}"), not the raw path, so ids don't create
     a new time series per request (high cardinality kills Prometheus)."""
     route = request.scope.get("route")
     return getattr(route, "path", "unmatched")
@@ -79,5 +78,5 @@ def record_llm_call(result) -> None:
 
 
 def metrics_response():
-    """(given) Body and content type for GET /metrics."""
+    """Body and content type for GET /metrics."""
     return generate_latest(REGISTRY), CONTENT_TYPE_LATEST

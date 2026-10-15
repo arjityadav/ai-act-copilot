@@ -1,4 +1,4 @@
-"""Phase 6 · MLOps: training, promotion gate, drift.   make test-phase P=6"""
+"""MLOps: classifier training and evaluation, promotion gate, drift (PSI)."""
 
 import numpy as np
 from sklearn.pipeline import Pipeline

@@ -1,4 +1,4 @@
-"""Load test (Phase 8).  make load  -> open http://localhost:8089, e.g. 20 users, spawn rate 2.
+"""Load test.  make load  -> open http://localhost:8089, e.g. 20 users, spawn rate 2.
 
 Measure p50/p95 latency and error rate for /chat and assessment creation; find where it breaks
 (LLM rate limits, worker concurrency, DB connections). Record results in docs/RUNBOOK.md.

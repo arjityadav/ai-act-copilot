@@ -1,7 +1,4 @@
-"""PHASE 4 · Intake agent: free text -> validated SystemProfile.
-
-Read first: notes Days 45 (structured output), 71 (context engineering).
-"""
+"""Intake agent: free text -> validated SystemProfile."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Phase 4 · Agents: rules, intake, classifier.   make test-phase P=4"""
+"""Agents: screening rules, intake agent, classifier agent and its verification."""
 
 import json
 

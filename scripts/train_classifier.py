@@ -1,4 +1,4 @@
-"""Train -> log to MLflow -> register -> promote if better (Phase 6).   make train
+"""Train -> log to MLflow -> register -> promote if better.   make train
 
 Also saves data/models/annex3.joblib as a local fallback for serving without MLflow.
 """

@@ -1,16 +1,14 @@
-"""PHASE 3 · The Q&A endpoints.
+"""The Q&A endpoints.
 
-POST /chat          JSON answer with sources           <- you write this one
-GET  /chat/stream   server-sent events (given)
-POST /feedback      thumbs up/down (given)
-
-Read first: notes Day 64 (serving RAG), FastAPI tutorial (path operations, request bodies, HTTPException).
+POST /chat          JSON answer with sources
+GET  /chat/stream   server-sent events
+POST /feedback      thumbs up/down
 """
 
 from __future__ import annotations
 
 import json
-import uuid  # noqa: F401  (you'll need it for trace ids)
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -52,9 +50,9 @@ def chat(
     1. guard = check_input(req.question, settings.max_input_chars); if not ok -> HTTPException(400, detail=guard.reason)
     2. question = redact_pii(req.question)
     3. trace_id = uuid.uuid4().hex
-    4. (Phase 7) if cache is not None and cache.get(question) returns a dict: return ChatResponse(**that, cached=True, trace_id=trace_id)
+    4. if cache is not None and cache.get(question) returns a dict: return ChatResponse(**that, cached=True, trace_id=trace_id)
     5. result = answer_question(question, store, embedder, provider)   (import it from app.rag.answer)
-    6. build the ChatResponse from the RagAnswer fields; (Phase 7) cache.put(question, <response dict without trace_id/cached>)
+    6. build the ChatResponse from the RagAnswer fields; cache.put(question, <response dict without trace_id/cached>)
        only when the answer isn't a refusal and citations are valid.
     """
     guard = check_input(req.question, settings.max_input_chars)

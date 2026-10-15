@@ -1,6 +1,4 @@
-"""PHASE 4 · Classifier agent: plan searches, read the law, classify with citations, check itself.
-
-Read first: notes Days 67–69 (agents, tool design), 59 (grounding), supplement S7.
+"""Classifier agent: plan searches, read the law, classify with citations, check itself.
 
 This is an agentic workflow rather than a free-roaming agent: the steps are fixed (plan ->
 retrieve -> decide -> verify), which makes it predictable, testable and cheap, while the LLM

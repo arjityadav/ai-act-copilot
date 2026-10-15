@@ -1,12 +1,10 @@
 # Model card — Annex III area classifier
 
-*Fill this in during Phase 6 and keep it up to date with every promoted version.*
-
 ## Overview
 - **Model:** TF-IDF (1–2-grams) + logistic regression (class-balanced), scikit-learn.
 - **Purpose:** fast second opinion on which Annex III area (if any) an AI system description belongs to. Used as a pre-screen inside the assessment pipeline; disagreement with the LLM classifier raises a review flag.
 - **Not for:** making compliance decisions on its own; descriptions in languages other than English (not trained).
-- **Current champion:** version __ (MLflow `models:/annex3-classifier@champion`), promoted on ____.
+- **Current champion:** version 2 (MLflow `models:/annex3-classifier@champion`), promoted on 2026-09-27. Version 1 (52 seed rows, macro F1 0.22) was rejected by the promotion gate.
 
 ## Data
 - **Seed:** 52 hand-written descriptions across 9 labels (`data/training/annex3_seed.csv`).
@@ -29,16 +27,18 @@
 ## Evaluation (held-out 25%, stratified)
 | Label | F1 |
 |---|---|
-| macro average | |
-| none | |
-| biometrics | |
-| critical_infrastructure | |
-| education | |
-| employment | |
-| essential_services | |
-| law_enforcement | |
-| migration | |
-| justice_democracy | |
+| **macro average** | **0.730** (accuracy 0.730) |
+| essential_services | 0.941 |
+| law_enforcement | 0.889 |
+| justice_democracy | 0.857 |
+| critical_infrastructure | 0.800 |
+| employment | 0.769 |
+| education | 0.706 |
+| none | 0.634 |
+| migration | 0.571 |
+| biometrics | 0.400 |
+
+The test set has about 63 rows, so classes with 13–15 examples (biometrics, migration) have only a few test cases each and their F1 is noisy.
 
 ## Promotion gate
 Macro F1 ≥ 0.70, at least 0.01 better than the champion, and no class drops by more than 0.10.
@@ -49,4 +49,5 @@ Weekly PSI on description length and predicted-label distribution (`.github/work
 ## Limitations and risks
 - Synthetic data can share the generator's blind spots and phrasing.
 - Short or vague descriptions are unreliable; the LLM classifier and a human remain responsible.
-- ____________________
+- Train and test data are both mostly LLM-generated, with a narrow, marketing-like style, so these scores likely overestimate performance on real user descriptions.
+- `none` is a catch-all class and absorbs confusion from the others.

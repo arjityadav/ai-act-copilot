@@ -1,4 +1,4 @@
-"""Tiny SQL migration runner (given): applies migrations/NNN_*.sql once each, in order.
+"""Tiny SQL migration runner: applies migrations/NNN_*.sql once each, in order.
 
 python -m app.db          (or: make migrate)
 """

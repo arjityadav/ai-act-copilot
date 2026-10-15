@@ -1,4 +1,4 @@
-"""Chunk storage and the two basic searches (given).
+"""Chunk storage and the two basic searches.
 
 Both stores have the same methods:
     upsert(chunks, embeddings)               insert or update (skips unchanged content)
@@ -7,7 +7,7 @@ Both stores have the same methods:
     get(chunk_id) -> Chunk | None ;  all_ids() -> set[str] ;  count() -> int
 
 InMemoryStore: tests and quick experiments. PostgresStore: pgvector (HNSW) + tsvector (GIN).
-Phase 2 combines the two searches into hybrid search (app/retrieval/search.py).
+Hybrid search (app/retrieval/search.py) combines the two.
 """
 
 from __future__ import annotations

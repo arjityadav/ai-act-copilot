@@ -1,7 +1,4 @@
-"""PHASE 7 · Scoring for the evaluation suites (used by evals/run_evals.py and CI).
-
-Read first: notes Days 49 (evals first), 50 (LLM-as-judge), 75 (evaluating agents), 89 (CI for AI).
-"""
+"""Scoring for the evaluation suites (used by evals/run_evals.py and CI)."""
 
 from __future__ import annotations
 

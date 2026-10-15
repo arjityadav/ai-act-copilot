@@ -1,4 +1,4 @@
-"""Retrieval metrics on evals/retrieval_eval.jsonl (Phase 2).   make eval-retrieval
+"""Retrieval metrics on evals/retrieval_eval.jsonl.   make eval-retrieval
 
 Compares vector-only, keyword-only and hybrid search (and hybrid + rerank with --rerank).
 Relevance is judged at the provision level: a hit on any chunk of "art-5" counts for "art-5".

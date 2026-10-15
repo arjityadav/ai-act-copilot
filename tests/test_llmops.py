@@ -1,4 +1,4 @@
-"""Phase 7 · LLMOps: fallback, semantic cache, eval scoring.   make test-phase P=7"""
+"""LLMOps: provider fallback, semantic cache, eval scoring."""
 
 import pytest
 

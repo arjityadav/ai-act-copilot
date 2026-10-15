@@ -1,6 +1,4 @@
-"""PHASE 6 · Drift monitoring: are production inputs still like the training data?
-
-Read first: notes Day 85 (observability, drift).
+"""Drift monitoring: are production inputs still like the training data?
 
 Population Stability Index (PSI) compares two distributions over the same bins:
     PSI = Σ (actual% − expected%) · ln(actual% / expected%)
@@ -63,7 +61,7 @@ def categorical_psi(expected_labels: list[str], actual_labels: list[str], eps: f
 def drift_report(
     train_texts: list[str], recent_texts: list[str], train_labels: list[str], recent_predictions: list[str]
 ) -> dict:
-    """(given) Summary used by scripts/drift_check.py and the scheduled GitHub Action."""
+    """Summary used by scripts/drift_check.py and the scheduled GitHub Action."""
     lengths = psi(
         np.array([len(t) for t in train_texts], float), np.array([len(t) for t in recent_texts], float)
     )

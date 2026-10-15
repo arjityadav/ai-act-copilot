@@ -1,4 +1,4 @@
-"""Phase 3 · RAG answers, guardrails and the /chat endpoint.   make test-phase P=3"""
+"""Grounded answers, citation checks, guardrails and the /chat endpoint."""
 
 from fastapi.testclient import TestClient
 

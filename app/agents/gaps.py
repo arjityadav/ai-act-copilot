@@ -1,4 +1,4 @@
-"""PHASE 5 · Gap analysis: what's already in place vs what's required (deterministic)."""
+"""Gap analysis: what's already in place vs what's required (deterministic)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""The FastAPI application (given).
+"""The FastAPI application.
 
 uvicorn app.main:app --reload            (or: make dev)
 docs at http://localhost:8000/docs
@@ -48,7 +48,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_chat.router)
     app.include_router(routes_assessments.router)
 
-    try:  # Phase 8: metrics middleware + /metrics endpoint
+    try:  # metrics middleware + /metrics endpoint
         from app.observability import metrics
 
         app.middleware("http")(metrics.metrics_middleware)

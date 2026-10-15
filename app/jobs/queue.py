@@ -1,8 +1,8 @@
-"""Running assessments in the background (given).
+"""Running assessments in the background.
 
 JOB_MODE=queue  -> Redis + RQ: the API enqueues, `rq worker assessments` (docker compose service) runs it.
 JOB_MODE=inline -> run immediately in the API process (tests, quick local dev).
-Long LLM pipelines never run inside the request: the API returns 202 + an id at once (notes Day 86).
+Long LLM pipelines never run inside the request: the API returns 202 + an id at once.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ def build_deps(repo, aid, settings=None):
 
         ml = load_classifier(settings or get_settings())
     except Exception:
-        ml = None  # the ML pre-screen is optional until Phase 6 is done
+        ml = None  # the ML pre-screen is optional: skipped if no model is available
     return PipelineDeps(
         provider=api_deps.provider_dep(),
         store=api_deps.store_dep(),

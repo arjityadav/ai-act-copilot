@@ -1,4 +1,4 @@
-"""Assessment storage (given): in memory for tests/dev, Postgres in production."""
+"""Assessment storage: in memory for tests/dev, Postgres in production."""
 
 from __future__ import annotations
 

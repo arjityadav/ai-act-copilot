@@ -1,16 +1,16 @@
-# Build process: EU AI Act Compliance Copilot
+# Build log: EU AI Act Compliance Copilot
 
-How the project was built, phase by phase, from an empty starter template to a live, continuously
+How the project was built, stage by stage, from a starter template to a live, continuously
 deployed system: the architecture at each stage, the tools, models and skills involved, the
 decisions and trade-offs, and what went wrong and was fixed along the way.
 
 - **Live:** [ai-act-copilot.duckdns.org](https://ai-act-copilot.duckdns.org) (web UI) ·
   [/docs](https://ai-act-copilot.duckdns.org/docs) (API)
-- **Timeline:** 26–30 September 2026 · 24 commits on `main`
-- **Scope:** built on a structured starter template. The scaffolding (Docker/Compose, FastAPI app
-  factory, database access, workflows) was provided; the core logic (retrieval, RAG, agents, MLOps,
-  LLMOps, metrics) was implemented phase by phase, each phase defined by its tests. Everything under
-  "Beyond the phases" (fixes from error analysis, deployment, UI in production, CD) was added on top.
+- **Timeline:** 26–30 September 2026
+- **Scope:** started from a starter template that provided the scaffolding (Docker/Compose, the
+  FastAPI app shell, database access, CI workflows). The core logic (retrieval, RAG, agents, MLOps,
+  LLMOps, metrics), the fixes from error analysis, the production deployment, the web UI in
+  production and continuous deployment were implemented on top of it.
 
 ---
 
@@ -104,17 +104,17 @@ every chat answer returns its `prompt_version`.
 
 ---
 
-## 4. Phase by phase
+## 4. Stage by stage
 
-### Phase 0 · Setup and provided infrastructure (26 Sep)
-- **Did:** installed uv, ran `make setup` (dependencies, pre-commit, `.env`), passed the Phase 0 tests,
+### Stage 0 · Setup (26 Sep)
+- **Did:** installed uv, ran `make setup` (dependencies, pre-commit, `.env`), ran the setup tests,
   pulled the Ollama models, pushed the repo to GitHub (after fixing Git authentication with the
   GitHub CLI and a root-owned `~/.config`).
 - **Fixed:** `docker-compose.yml` hard-coded the Ollama container address, so the stack couldn't use
   the native Mac Ollama app (the only one with GPU access). Made it configurable (`DOCKER_OLLAMA_HOST`).
 - **Skills:** Git over HTTPS with tokens/`gh`, file permissions, reading a starter codebase.
 
-### Phase 1 · Parsing, chunking, ingestion (26 Sep)
+### Stage 1 · Parsing, chunking, ingestion (26 Sep)
 - **Built:** `parse_act` (a line-by-line state machine: skip recitals, detect `CHAPTER`/`Article`/`ANNEX`
   headings with anchored regexes, "next line is the title" flags, de-duplicate repeated headings),
   `split_paragraphs` (group lines at numbered paragraphs), `chunk_provision` (pack paragraphs up to
@@ -126,14 +126,14 @@ every chat answer returns its `prompt_version`.
 - **Skills:** regex, state machines, dataclasses, structure-aware chunking, contextual chunk headers,
   idempotency.
 
-### Phase 2 · Hybrid retrieval and metrics (26 Sep)
+### Stage 2 · Hybrid retrieval and metrics (26 Sep)
 - **Built:** Reciprocal Rank Fusion, `hybrid_search` (vector + keyword, one lookup dict instead of extra
   DB calls, optional cross-encoder reranker), `recall_at_k`, `mrr`.
 - **Result (25 questions):** recall@5 keyword 0.42 · vector 0.90 · **hybrid 0.90**; MRR 0.771 → **0.788**.
 - **Bugs fixed:** set intersection missing in recall; passing RRF's damping constant `k` as a top-k.
 - **Skills:** information retrieval, rank fusion, retrieval evaluation, set operations.
 
-### Phase 3 · Grounded answers, guardrails, `/chat` (26–27 Sep)
+### Stage 3 · Grounded answers, guardrails, `/chat` (26–27 Sep)
 - **Built:** XML-delimited prompt with numbered documents (question last), citation extraction
   (`[2]`, `[1][3]`, `[1, 3]`), citation validation (≥ 1 citation, all in range), `answer_question`,
   input guardrails (empty, length, prompt injection), PII redaction (email, IBAN, phone, order matters),
@@ -145,7 +145,7 @@ every chat answer returns its `prompt_version`.
 - **Skills:** grounded generation, hallucination detection in code, prompt injection (OWASP LLM01),
   GDPR data minimisation, FastAPI dependency injection.
 
-### Infrastructure lessons I1–I3 · Docker, Compose, FastAPI (27 Sep)
+### Infrastructure · Docker, Compose, FastAPI (27 Sep)
 - **Docker:** multi-stage build, layer caching (71.8 s → 11.7 s rebuild), non-root user, healthcheck,
   `localhost` inside a container, `EXPOSE` vs `-p`.
 - **Compose:** fixed two host-port conflicts (MLflow vs macOS AirPlay on 5000 → 5001; Ollama behind a
@@ -155,7 +155,7 @@ every chat answer returns its `prompt_version`.
   `@lru_cache`, `dependency_overrides` for tests; added `GET /stats`.
 - **Also:** ruff B008 false positive for FastAPI `Depends` → configured `extend-immutable-calls`.
 
-### Phase 4 · Rules, intake agent, classifier agent (27 Sep)
+### Stage 4 · Rules, intake agent, classifier agent (27 Sep)
 - **Built:** deterministic screening rules (`screen`), the intake agent (free text → validated
   `SystemProfile` via structured output, clarifications, a provider/deployer question), and the
   classifier as an **agentic workflow**: query planning → de-duplicated retrieval → structured
@@ -167,12 +167,12 @@ every chat answer returns its `prompt_version`.
 - **Skills:** structured output with Pydantic + retries, human-in-the-loop, workflow vs free agent,
   defence in depth for LLM output.
 
-### Infrastructure lesson I4 · Postgres and pgvector (27 Sep)
+### Database · Postgres and pgvector (27 Sep)
 - Inspected the schema with `psql`: HNSW (approximate nearest neighbours, cosine) and GIN (full-text)
   indexes; `EXPLAIN` showed a sequential scan (correct at 292 rows); similarity scores bunched at
   0.88–0.91 (why ranks beat scores, why cache thresholds must be strict); wrote `GROUP BY` queries.
 
-### Phase 5 · LangGraph orchestration (27 Sep)
+### Stage 5 · LangGraph orchestration (27 Sep)
 - **Built:** obligations lookup (curated table, unknown role shows both sides), gap analysis (status,
   deadline-based priority, stable sort), the report verifier (collect **all** issues), routing
   functions, and the graph (conditional edges, parallel classify/ML fan-out with a list-edge join,
@@ -184,13 +184,13 @@ every chat answer returns its `prompt_version`.
   **5 min 29 s → 2 min 22 s (−57%)**. The same run showed "right category, wrong legal route, no
   citations" and a fabricated quote.
 
-### Infrastructure lesson I5 · Redis and job queues (27 Sep)
+### Background jobs · Redis and RQ (27 Sep)
 - 202 Accepted + background worker; the **claim-check pattern** (Redis holds only the id, Postgres the
   data). Experiments: the queue holds jobs while the worker is down; **a worker killed mid-job leaves
   the assessment `running` forever**. Layered fixes identified (reconciler, retries with idempotency,
   failure callback, graceful shutdown, checkpointing); at-most-once vs at-least-once delivery.
 
-### Phase 6 · MLOps (27 Sep)
+### Stage 6 · MLOps (27 Sep)
 - **Built:** TF-IDF + logistic regression pipeline, macro-F1/per-class evaluation, the promotion gate
   (minimum F1, must beat the champion, no per-class regression), PSI drift (numeric and categorical).
 - **Data work:** 52 seed rows gave macro F1 **0.22 → rejected by the gate**. Generated 270 synthetic
@@ -199,7 +199,7 @@ every chat answer returns its `prompt_version`.
   Audit script and model card committed with the data.
 - **Skills:** data-centric ML, metric choice under imbalance, data leakage, model registry, drift.
 
-### Phase 7 · LLMOps (28 Sep)
+### Stage 7 · LLMOps (28 Sep)
 - **Built:** eval scoring (category, Annex III area, transparency, citation recall; `None` ≠ `False`),
   aggregation, LLM-as-judge agreement (accuracy/TPR/TNR), the semantic cache (cosine ≥ 0.95, TTL, size
   cap), provider fallback (streams only fall back before the first token).
@@ -213,7 +213,7 @@ every chat answer returns its `prompt_version`.
 - **Skills:** evals as the development loop, error analysis, failure taxonomies, cost asymmetry of
   errors, caching risk, reliability patterns.
 
-### Phase 8 · Observability and CI/CD (28 Sep)
+### Stage 8 · Observability and CI/CD (28 Sep)
 - **Built:** metrics middleware (route templates to keep cardinality low, 500 on exceptions, `/metrics`
   excluded) and LLM token/cost/latency metrics.
 - **Fixed:** an order-dependent test (env setup moved to `tests/conftest.py`), which exposed a production
@@ -225,7 +225,7 @@ every chat answer returns its `prompt_version`.
 - **Repo hygiene:** rewrote history once (machine-local author emails, `CLAUDE.md`), with a backup
   branch and `--force-with-lease`.
 
-### Beyond the phases: deployment, UI, CD (28–30 Sep)
+### Production: deployment, UI, CD (28–30 Sep)
 - **Production stack** (`docker-compose.prod.yml`): Caddy with automatic HTTPS, only ports 80/443
   public, Postgres/Redis internal only, `APP_ENV=prod` requires an API key, Redis persistence, memory
   limits, and a fail-fast MLflow lookup. Caught before it happened: `.gitignore` would have committed
@@ -256,7 +256,7 @@ every chat answer returns its `prompt_version`.
 | Tests | **64 unit tests** + integration tests against real Postgres/Redis; CI green |
 | Hosting cost | **$0** |
 
-## 6. Skills practised
+## 6. Skills
 
 - **AI engineering:** RAG end to end (parsing, chunking, embeddings, hybrid retrieval, grounding,
   citation verification), multi-agent orchestration, structured output, human-in-the-loop, guardrails.
@@ -284,5 +284,4 @@ every chat answer returns its `prompt_version`.
 - Stretch: Kubernetes (k3s on the same VM), Helm, Terraform for the Oracle resources
 
 See also: [README.md](README.md) (overview and results), [docs/DEPLOY.md](docs/DEPLOY.md) (runbook
-for deployment and CD), [docs/MODEL_CARD.md](docs/MODEL_CARD.md) (classifier data and evaluation),
-[docs/BLUEPRINT.md](docs/BLUEPRINT.md) (original design).
+for deployment and CD), [docs/MODEL_CARD.md](docs/MODEL_CARD.md) (classifier data and evaluation).

@@ -1,4 +1,4 @@
-"""Download the AI Act from EUR-Lex and turn the HTML into clean lines of text (given).
+"""Download the AI Act from EUR-Lex and turn the HTML into clean lines of text.
 
 EUR-Lex sometimes blocks automated downloads. If fetch fails, open ACT_URL in your browser,
 save the page as data/raw/ai_act.html, and run the ingest script with --file.

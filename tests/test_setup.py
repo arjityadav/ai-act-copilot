@@ -1,4 +1,4 @@
-"""Phase 0 · The provided infrastructure works (these pass from the start).   make test-phase P=0"""
+"""Foundations: structured output with retries, the in-memory store, prompts, data and config files."""
 
 import glob
 

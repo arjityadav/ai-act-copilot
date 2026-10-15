@@ -1,6 +1,4 @@
-"""PHASE 3 · Grounded answers with verifiable citations.
-
-Read first: notes Days 59 (grounded generation & citations), 55 (RAG architecture).
+"""Grounded answers with verifiable citations.
 
 The contract with the model: numbered documents in, an answer with [n] markers out. Then we
 CHECK the markers in code: citing a document that doesn't exist is a hallucination signal.
@@ -30,7 +28,7 @@ class RagAnswer:
 
 
 def build_user_message(question: str, chunks: list[Chunk]) -> str:
-    """Documents first, question last (notes Day 59). Format exactly:
+    """Documents first, question last. Format exactly:
 
         <documents>
         <document n="1" citation="Article 5">

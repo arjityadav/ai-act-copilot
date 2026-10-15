@@ -1,4 +1,4 @@
-"""Versioned prompts (given). Prompts live in prompts/*.yaml, not in code, so they can be reviewed,
+"""Versioned prompts. Prompts live in prompts/*.yaml, not in code, so they can be reviewed,
 diffed and evaluated like any other artifact; every LLM call logs the prompt name + version."""
 
 from __future__ import annotations

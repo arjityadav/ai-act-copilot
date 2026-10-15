@@ -1,4 +1,4 @@
-"""End-to-end assessment evals (Phase 7).   make evals
+"""End-to-end assessment evals.   make evals
 
 Runs the intake -> screen -> classify steps for each scenario in evals/scenarios.jsonl and
 scores the classification with app/llmops/evals.py. Clarifying questions are skipped: the eval
